@@ -1,3 +1,9 @@
+## [1.1.0](https://github.com/CozyCode890/HoiTruyenChu-patches/compare/v1.0.1...v1.1.0) (2026-11-13)
+
+### ✨ New Features
+
+* TTS media widget controls and resume listening position ([1b4272b](https://github.com/CozyCode890/HoiTruyenChu-patches/commit/1b4272b710dab452c800a5c5565a08339f2ef85f))
+
 ## [1.0.1](https://github.com/CozyCode890/HoiTruyenChu-patches/compare/v1.0.0...v1.0.1) (2026-11-13)
 
 ### 🐛 Bug Fixes

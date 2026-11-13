@@ -1,6 +1,6 @@
 {
   "NOTE": "Do NOT manually edit this file. This file is automatically updated when semantic release (release.yml) runs. Manually editing this file can break your releases and break third party tools that use this file.",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "patches": [
     {
       "name": "Auto sync reading history",
@@ -105,8 +105,76 @@
       "options": []
     },
     {
+      "name": "Resume listening position",
+      "description": "Opening a book from the bookshelf or \"Đọc truyện\" goes back to the line where the listening stopped: the voice bar opens with the play button and the line is highlighted, pressing play continues from there.",
+      "default": true,
+      "category": null,
+      "compatiblePackages": [
+        {
+          "packageName": "com.ngoctieucac.itruyenchu",
+          "name": "iTruyenChu",
+          "description": null,
+          "apkFileType": "APK",
+          "appIconColor": "#FFFFFF",
+          "signatures": null,
+          "formFactor": "MOBILE",
+          "targets": [
+            {
+              "version": "2.1.0",
+              "versionCodes": null,
+              "isExperimental": false,
+              "minSdk": null,
+              "description": null
+            },
+            {
+              "version": null,
+              "versionCodes": null,
+              "isExperimental": true,
+              "minSdk": null,
+              "description": null
+            }
+          ]
+        }
+      ],
+      "options": []
+    },
+    {
       "name": "Show chapter titles",
       "description": "Shows the real chapter titles instead of \"Vô Đề Mục\" in the chapter list, the reader and the TTS: books whose chapter list only has \"Chương N\" get the title from the first line of the chapter text (public preview, no login needed), cached on the device.",
+      "default": true,
+      "category": null,
+      "compatiblePackages": [
+        {
+          "packageName": "com.ngoctieucac.itruyenchu",
+          "name": "iTruyenChu",
+          "description": null,
+          "apkFileType": "APK",
+          "appIconColor": "#FFFFFF",
+          "signatures": null,
+          "formFactor": "MOBILE",
+          "targets": [
+            {
+              "version": "2.1.0",
+              "versionCodes": null,
+              "isExperimental": false,
+              "minSdk": null,
+              "description": null
+            },
+            {
+              "version": null,
+              "versionCodes": null,
+              "isExperimental": true,
+              "minSdk": null,
+              "description": null
+            }
+          ]
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "TTS media controls",
+      "description": "The media widget / lock screen shows the TTS reading instead of the silent 6 s file of the voice bar: playing or paused, the position in the chapter (line x/y), and its play / pause buttons pause and resume the reading.",
       "default": true,
       "category": null,
       "compatiblePackages": [
