@@ -11,6 +11,10 @@ public interface Player {
     int DISCONTINUITY_REASON_INTERNAL = 5;
 
     int COMMAND_PLAY_PAUSE = 1;
+    int COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM = 6;
+    int COMMAND_SEEK_TO_PREVIOUS = 7;
+    int COMMAND_SEEK_TO_NEXT_MEDIA_ITEM = 8;
+    int COMMAND_SEEK_TO_NEXT = 9;
     int COMMAND_GET_CURRENT_MEDIA_ITEM = 16;
     int COMMAND_GET_TIMELINE = 17;
     int COMMAND_GET_METADATA = 18;
@@ -19,6 +23,10 @@ public interface Player {
     Looper getApplicationLooper();
 
     final class Commands {
+        public Builder buildUpon() {
+            throw new UnsupportedOperationException("Stub");
+        }
+
         public static final class Builder {
             public Builder() {
                 throw new UnsupportedOperationException("Stub");

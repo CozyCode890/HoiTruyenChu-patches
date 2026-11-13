@@ -3,18 +3,10 @@ package app.hoitruyenchu.patches.itruyenchu.misc.resume
 import app.hoitruyenchu.patches.itruyenchu.audio.tts.ttsReliabilityPatch
 import app.hoitruyenchu.patches.itruyenchu.shared.Constants.COMPATIBILITY_ITRUYENCHU
 import app.hoitruyenchu.patches.itruyenchu.shared.Constants.EXTENSION_RESUME_LISTENING
-import app.morphe.patcher.Fingerprint
+import app.hoitruyenchu.patches.itruyenchu.shared.ReactInstanceLoadJSBundleFingerprint
 import app.morphe.patcher.extensions.InstructionExtensions.addInstruction
 import app.morphe.patcher.patch.patch
 import com.android.tools.smali.dexlib2.Opcode
-
-/** React Native (bridgeless): ReactInstance.loadJSBundle(bundleLoader), loads the app bundle. */
-internal object ReactInstanceLoadJSBundleFingerprint : Fingerprint(
-    definingClass = "Lcom/facebook/react/runtime/ReactInstance;",
-    name = "loadJSBundle",
-    returnType = "V",
-    parameters = listOf("Lcom/facebook/react/bridge/JSBundleLoader;"),
-)
 
 @Suppress("unused")
 val resumeListeningPatch = patch(

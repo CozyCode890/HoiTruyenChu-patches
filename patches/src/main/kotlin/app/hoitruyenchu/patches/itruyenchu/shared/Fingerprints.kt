@@ -39,3 +39,11 @@ internal object AsyncStorageMultiSetFingerprint : Fingerprint(
     returnType = "V",
     parameters = listOf(READABLE_ARRAY, CALLBACK),
 )
+
+/** React Native (bridgeless): ReactInstance.loadJSBundle(bundleLoader), loads the app bundle. */
+internal object ReactInstanceLoadJSBundleFingerprint : Fingerprint(
+    definingClass = "Lcom/facebook/react/runtime/ReactInstance;",
+    name = "loadJSBundle",
+    returnType = "V",
+    parameters = listOf("Lcom/facebook/react/bridge/JSBundleLoader;"),
+)

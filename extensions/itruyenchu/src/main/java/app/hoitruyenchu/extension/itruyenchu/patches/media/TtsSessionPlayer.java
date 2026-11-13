@@ -61,7 +61,7 @@ final class TtsSessionPlayer extends SimpleBasePlayer {
 
     @Override
     protected State getState() {
-        boolean playing = TtsController.isReading();
+        boolean playing = TtsMediaSession.displayedPlaying(TtsController.isReading());
         long durationMs = ReadingProgress.durationMs();
         MediaMetadata metadata = buildMetadata();
         MediaItem item = new MediaItem.Builder()
@@ -77,6 +77,10 @@ final class TtsSessionPlayer extends SimpleBasePlayer {
                 .build();
         Player.Commands commands = new Player.Commands.Builder()
                 .add(Player.COMMAND_PLAY_PAUSE)
+                .add(Player.COMMAND_SEEK_TO_PREVIOUS)
+                .add(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
+                .add(Player.COMMAND_SEEK_TO_NEXT)
+                .add(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
                 .add(Player.COMMAND_GET_CURRENT_MEDIA_ITEM)
                 .add(Player.COMMAND_GET_TIMELINE)
                 .add(Player.COMMAND_GET_METADATA)
@@ -104,15 +108,34 @@ final class TtsSessionPlayer extends SimpleBasePlayer {
     @Override
     protected ListenableFuture<?> handleSetPlayWhenReady(boolean playWhenReady) {
         try {
-            if (playWhenReady) {
-                if (!TtsController.resumeByUser()) {
-                    Log.i(TtsMediaSession.TAG, "play pressed but the reading was stopped in the app");
-                }
-            } else {
-                TtsController.pauseByUser();
-            }
+            TtsMediaSession.onPlayPause(playWhenReady);
         } catch (Throwable t) {
             Log.w(TtsMediaSession.TAG, "play/pause failed", t);
+        }
+        return Futures.immediateVoidFuture();
+    }
+
+    /**
+     * Next / previous buttons. With a single item media3 still calls this (index -1 when there is
+     * nothing to seek to), the command tells which button it was.
+     */
+    @Override
+    protected ListenableFuture<?> handleSeek(int mediaItemIndex, long positionMs, int seekCommand) {
+        try {
+            switch (seekCommand) {
+                case Player.COMMAND_SEEK_TO_NEXT:
+                case Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM:
+                    TtsMediaSession.onSkip(true);
+                    break;
+                case Player.COMMAND_SEEK_TO_PREVIOUS:
+                case Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM:
+                    TtsMediaSession.onSkip(false);
+                    break;
+                default:
+                    break;
+            }
+        } catch (Throwable t) {
+            Log.w(TtsMediaSession.TAG, "seek failed", t);
         }
         return Futures.immediateVoidFuture();
     }

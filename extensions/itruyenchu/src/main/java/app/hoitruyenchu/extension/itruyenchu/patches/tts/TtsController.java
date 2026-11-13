@@ -112,6 +112,8 @@ public final class TtsController {
 
     /** AsyncStorage key of the voice bar store (useTTSVoiceStore). */
     private static final String KEY_VOICE_STATE = "tts_voice_state";
+    /** AsyncStorage key of the answers of the voice bar script to the media controls. */
+    private static final String KEY_MEDIA_ANSWER = "htc_media_ack";
     /** Speed last saved by the voice bar, null until it saves one. */
     private static Float chosenRate;
 
@@ -137,6 +139,10 @@ public final class TtsController {
 
     private static WeakReference<Object> deferredTimerManager;
     private static boolean bypassTimerDefer;
+    /** JS timers paused by us in background (reading ended), resumed when a reading starts again. */
+    private static WeakReference<Object> pausedTimerManager;
+    private static boolean appInBackground;
+    private static boolean selfResuming;
 
     private TtsController() {
     }
@@ -174,6 +180,16 @@ public final class TtsController {
                 return;
             }
             spokeSinceStop = true;
+            if (userPaused) {
+                // Play pressed in the app (e.g. a voice bar mounted again, showing "play") while the
+                // reading was paused from the media controls: the app reads from its line again, the
+                // line kept for the resume is obsolete. Without this the new line stayed queued.
+                Log.i(TAG, "new reading while paused from the media controls, dropping " + pending.size() + " kept line(s)");
+                userPaused = false;
+                pending.clear();
+                suppressStop.clear();
+                respoken.clear();
+            }
             Utterance u = new Utterance(id, text, language, pitch, rate, voice);
             pending.put(id, u);
             touchLocked();
@@ -220,7 +236,12 @@ public final class TtsController {
             for (int i = 0; i < pairs.size(); i++) {
                 ReadableArray pair = pairs.getArray(i);
                 if (pair == null || pair.size() < 2 || pair.isNull(0) || pair.isNull(1)) continue;
-                if (!KEY_VOICE_STATE.equals(pair.getString(0))) continue;
+                String key = pair.getString(0);
+                if (KEY_MEDIA_ANSWER.equals(key)) {
+                    notifyMediaAnswer(pair.getString(1));
+                    continue;
+                }
+                if (!KEY_VOICE_STATE.equals(key)) continue;
                 JSONObject state = new JSONObject(pair.getString(1)).optJSONObject("state");
                 if (state == null) continue;
                 Object speed = state.has("speed") ? state.opt("speed") : state.opt("spead");
@@ -323,6 +344,7 @@ public final class TtsController {
     public static boolean shouldDeferHostPause(Object timerManager) {
         synchronized (lock) {
             if (bypassTimerDefer || timerManager == null) return false;
+            appInBackground = true;
             if (!sessionActiveLocked()) return false;
             Log.i(TAG, "app paused while reading, keeping JS timers running");
             deferredTimerManager = new WeakReference<>(timerManager);
@@ -334,7 +356,40 @@ public final class TtsController {
     /** Called at the start of JavaTimerManager.onHostResume(). */
     public static void onHostResume() {
         synchronized (lock) {
+            if (selfResuming) return;
+            appInBackground = false;
             deferredTimerManager = null;
+            pausedTimerManager = null;
+        }
+    }
+
+    /**
+     * A command of the media controls is about to be sent to the app: the JS timers (needed by the
+     * voice bar, e.g. requestAnimationFrame when a chapter starts) must run even in background.
+     */
+    public static void wakeJsTimers() {
+        synchronized (lock) {
+            touchLocked();
+        }
+    }
+
+    private static void resumeTimerManager(Object timerManager) {
+        synchronized (lock) {
+            if (!appInBackground) return;
+            selfResuming = true;
+        }
+        Log.i(TAG, "reading again in background, resuming JS timers");
+        try {
+            timerManager.getClass().getMethod("onHostResume").invoke(timerManager);
+        } catch (Throwable t) {
+            Log.w(TAG, "could not resume JS timers", t);
+        } finally {
+            synchronized (lock) {
+                selfResuming = false;
+                // Paused again when the reading session ends.
+                deferredTimerManager = new WeakReference<>(timerManager);
+                ensureTickingLocked();
+            }
         }
     }
 
@@ -704,6 +759,13 @@ public final class TtsController {
         return true;
     }
 
+    private static void notifyMediaAnswer(String json) {
+        try {
+            app.hoitruyenchu.extension.itruyenchu.patches.media.TtsMediaSession.onAnswer(json);
+        } catch (Throwable ignored) {
+        }
+    }
+
     private static void notifyMedia() {
         try {
             app.hoitruyenchu.extension.itruyenchu.patches.media.TtsMediaSession.notifyChanged(0);
@@ -726,6 +788,11 @@ public final class TtsController {
     private static void touchLocked() {
         lastActivity = SystemClock.elapsedRealtime();
         ensureTickingLocked();
+        if (pausedTimerManager != null) {
+            final Object timerManager = pausedTimerManager.get();
+            pausedTimerManager = null;
+            if (timerManager != null) main.post(() -> resumeTimerManager(timerManager));
+        }
     }
 
     private static void ensureTickingLocked() {
@@ -858,6 +925,9 @@ public final class TtsController {
         }
         try {
             timerManager.getClass().getMethod("onHostPause").invoke(timerManager);
+            synchronized (lock) {
+                pausedTimerManager = new WeakReference<>(timerManager);
+            }
         } catch (Throwable t) {
             Log.w(TAG, "could not pause JS timers", t);
         } finally {

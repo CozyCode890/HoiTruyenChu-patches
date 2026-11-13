@@ -1,13 +1,6 @@
 package app.hoitruyenchu.extension.itruyenchu.patches.resume;
 
-import android.content.Context;
-import android.util.Log;
-
-import java.io.File;
-import java.io.FileOutputStream;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.nio.charset.StandardCharsets;
+import app.hoitruyenchu.extension.itruyenchu.patches.shared.JsScripts;
 
 /**
  * Opening a book (bookshelf, "Đọc truyện") always showed the chapter from the top: the reader resets
@@ -29,23 +22,7 @@ public final class ResumeListeningPatch {
 
     /** End of ReactInstance.loadJSBundle(loader): the app bundle is scheduled, queue the script after it. */
     public static void afterMainBundle(Object reactInstance) {
-        try {
-            Field contextField = reactInstance.getClass().getDeclaredField("context");
-            contextField.setAccessible(true);
-            Context context = (Context) contextField.get(reactInstance);
-            File file = new File(context.getFilesDir(), FILE_NAME);
-            byte[] bytes = SCRIPT.getBytes(StandardCharsets.UTF_8);
-            try (FileOutputStream out = new FileOutputStream(file)) {
-                out.write(bytes);
-            }
-            Method load = reactInstance.getClass()
-                    .getDeclaredMethod("loadJSBundleFromFile", String.class, String.class);
-            load.setAccessible(true);
-            load.invoke(reactInstance, file.getAbsolutePath(), FILE_NAME);
-            Log.i(TAG, "resume script queued");
-        } catch (Throwable t) {
-            Log.e(TAG, "could not load the resume script", t);
-        }
+        JsScripts.load(reactInstance, FILE_NAME, SCRIPT, TAG);
     }
 
     /**

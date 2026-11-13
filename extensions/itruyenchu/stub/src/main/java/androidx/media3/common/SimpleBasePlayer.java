@@ -31,6 +31,10 @@ public abstract class SimpleBasePlayer implements Player {
         throw new UnsupportedOperationException("Stub");
     }
 
+    protected ListenableFuture<?> handleSeek(int mediaItemIndex, long positionMs, int seekCommand) {
+        throw new UnsupportedOperationException("Stub");
+    }
+
     public interface PositionSupplier {
         long get();
     }
