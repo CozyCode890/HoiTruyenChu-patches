@@ -115,6 +115,17 @@ public final class TtsController {
     /** Speed last saved by the voice bar, null until it saves one. */
     private static Float chosenRate;
 
+    /** Paused from the media widget / lock screen: like a call, the current line is read again on resume. */
+    private static boolean userPaused;
+    /** Last JS Speech.stop() and whether a line was requested since. */
+    private static long lastStopAt;
+    private static boolean spokeSinceStop = true;
+    private static long lastDoneAt;
+    /** What the voice bar says at the end of a chapter before it opens the next one. */
+    private static final String END_OF_CHAPTER = "Hết chương";
+    /** A reading stays "playing" for the widget this long after a line, while JS asks for the next one. */
+    private static final long PLAYING_GRACE_MS = 4_000;
+
     private static boolean interrupted;
     private static int normalModeTicks;
     private static int stallTicks;
@@ -154,16 +165,26 @@ public final class TtsController {
      */
     public static void speak(String id, String text, String language, Float pitch, Float rate, String voice) {
         synchronized (lock) {
+            if (END_OF_CHAPTER.equals(text) && !spokeSinceStop
+                    && SystemClock.elapsedRealtime() - lastStopAt < 2_000) {
+                // The voice bar was mounted while its "playing" flag was still set from an earlier
+                // reading: it stops the speech and reads its still empty text, i.e. says "Hết chương"
+                // and then opens the NEXT chapter. Drop it; the chapter text arriving restarts the reading.
+                Log.i(TAG, "dropping end-of-chapter spoken right after stop (reader just opened)");
+                return;
+            }
+            spokeSinceStop = true;
             Utterance u = new Utterance(id, text, language, pitch, rate, voice);
             pending.put(id, u);
             touchLocked();
             if (tts == null) createLocked("speak without engine");
-            if (!ready || interrupted) {
-                Log.d(TAG, "queued " + id + (interrupted ? " (call active)" : " (engine not ready)"));
-                return;
+            if (!ready || blockedLocked()) {
+                Log.d(TAG, "queued " + id + (blockedLocked() ? " (paused)" : " (engine not ready)"));
+            } else {
+                sendLocked(u);
             }
-            sendLocked(u);
         }
+        notifyMedia();
     }
 
     /** Replaces textToSpeech.stop() called by JS Speech.stop(). */
@@ -173,9 +194,14 @@ public final class TtsController {
             suppressStop.clear();
             respoken.clear();
             interrupted = false;
+            userPaused = false;
             normalModeTicks = 0;
             stallTicks = 0;
+            lastStopAt = SystemClock.elapsedRealtime();
+            spokeSinceStop = false;
         }
+        ReadingProgress.onLineInterrupted();
+        notifyMedia();
         try {
             return engine != null ? engine.stop() : TextToSpeech.SUCCESS;
         } catch (Throwable t) {
@@ -212,7 +238,7 @@ public final class TtsController {
             chosenRate = rate;
             if (previous == null || previous == rate) return;
             Log.i(TAG, "speed changed to " + rate);
-            if (tts == null || !ready || interrupted) return;
+            if (tts == null || !ready || blockedLocked()) return;
             // Speak the current line again at the new speed (the engine cannot change it mid-line).
             boolean restart = false;
             for (Utterance u : pending.values()) {
@@ -277,7 +303,9 @@ public final class TtsController {
             suppressStop.clear();
             respoken.clear();
             interrupted = false;
+            userPaused = false;
         }
+        notifyMedia();
         try {
             if (engine != null) engine.shutdown();
         } catch (Throwable ignored) {
@@ -366,7 +394,7 @@ public final class TtsController {
                 initFailures = 0;
                 tts.setOnUtteranceProgressListener(new Listener(gen));
                 lock.notifyAll();
-                if (!interrupted) flushLocked();
+                if (!blockedLocked()) flushLocked();
                 return;
             }
             initFailures++;
@@ -518,9 +546,16 @@ public final class TtsController {
         @Override
         public void onStart(String id) {
             if (stale()) return;
+            String text;
+            Float rate;
             synchronized (lock) {
                 stallTicks = 0;
+                Utterance u = pending.get(id);
+                text = u != null ? u.text : null;
+                rate = appliedRate;
             }
+            ReadingProgress.onLineStarted(text, rate);
+            notifyMedia();
             UtteranceProgressListener l = appListener;
             if (l != null) l.onStart(id);
         }
@@ -533,7 +568,11 @@ public final class TtsController {
                 suppressStop.remove(id);
                 respoken.remove(id);
                 touchLocked();
+                lastDoneAt = SystemClock.elapsedRealtime();
             }
+            ReadingProgress.onLineDone();
+            notifyMedia();
+            notifyMediaLater(PLAYING_GRACE_MS + 200);
             UtteranceProgressListener l = appListener;
             if (l != null) l.onDone(id);
         }
@@ -574,7 +613,7 @@ public final class TtsController {
             if (respoken.remove(id)) return;
             Utterance u = pending.get(id);
             if (u != null) {
-                if (interrupted || suppressStop.remove(id)) {
+                if (blockedLocked() || suppressStop.remove(id)) {
                     // Caused by our own call interruption, it will be spoken again.
                     u.sent = false;
                     return;
@@ -589,7 +628,7 @@ public final class TtsController {
                         synchronized (lock) {
                             if (gen != generation) return;
                             if (serviceGone) engineLostLocked("utterance error " + code);
-                            else if (ready && !interrupted) flushLocked();
+                            else if (ready && !blockedLocked()) flushLocked();
                         }
                     }, 800);
                     return;
@@ -608,6 +647,76 @@ public final class TtsController {
 
     // ---------------------------------------------------------------------------------------------
     // Session, call interruption, stall watchdog, wake lock, deferred JS timer pause
+
+    private static boolean blockedLocked() {
+        return interrupted || userPaused;
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Media widget / lock screen (see TtsMediaSession)
+
+    /** True while a reading is going on and not paused, as shown by the media widget. */
+    public static boolean isReading() {
+        synchronized (lock) {
+            if (blockedLocked()) return false;
+            if (!pending.isEmpty()) return true;
+            return lastDoneAt > lastStopAt
+                    && SystemClock.elapsedRealtime() - lastDoneAt < PLAYING_GRACE_MS;
+        }
+    }
+
+    /** Pause button of the media widget: stop the engine but keep the line to read it again later. */
+    public static void pauseByUser() {
+        synchronized (lock) {
+            if (userPaused || pending.isEmpty()) return;
+            Log.i(TAG, "paused from the media controls");
+            userPaused = true;
+            for (Utterance u : pending.values()) {
+                if (u.sent) suppressStop.add(u.id);
+                u.sent = false;
+            }
+            try {
+                if (tts != null) tts.stop();
+            } catch (Throwable ignored) {
+            }
+        }
+        ReadingProgress.onLineInterrupted();
+        notifyMedia();
+    }
+
+    /**
+     * Play button of the media widget.
+     *
+     * @return false when there is nothing to resume (the reading was stopped in the app).
+     */
+    public static boolean resumeByUser() {
+        synchronized (lock) {
+            if (!userPaused) return false;
+            Log.i(TAG, "resumed from the media controls, " + pending.size() + " utterance(s)");
+            userPaused = false;
+            touchLocked();
+            if (!interrupted) {
+                if (tts == null) createLocked("resume from media controls");
+                else if (ready) flushLocked();
+            }
+        }
+        notifyMedia();
+        return true;
+    }
+
+    private static void notifyMedia() {
+        try {
+            app.hoitruyenchu.extension.itruyenchu.patches.media.TtsMediaSession.notifyChanged(0);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static void notifyMediaLater(long delayMs) {
+        try {
+            app.hoitruyenchu.extension.itruyenchu.patches.media.TtsMediaSession.notifyChanged(delayMs);
+        } catch (Throwable ignored) {
+        }
+    }
 
     private static boolean sessionActiveLocked() {
         if (!pending.isEmpty() || interrupted) return true;
@@ -632,7 +741,7 @@ public final class TtsController {
             checkStallLocked();
 
             boolean active = sessionActiveLocked();
-            if (active) {
+            if (active && !userPaused) {
                 holdWakeLockLocked();
             } else {
                 releaseWakeLockLocked();
@@ -673,6 +782,8 @@ public final class TtsController {
                     if (tts != null) tts.stop();
                 } catch (Throwable ignored) {
                 }
+                ReadingProgress.onLineInterrupted();
+                notifyMedia();
             }
         } else if (interrupted) {
             if (++normalModeTicks >= RESUME_TICKS) {
@@ -680,8 +791,11 @@ public final class TtsController {
                 interrupted = false;
                 normalModeTicks = 0;
                 lastActivity = SystemClock.elapsedRealtime();
-                if (tts == null) createLocked("resume after call");
-                else if (ready) flushLocked();
+                if (!userPaused) {
+                    if (tts == null) createLocked("resume after call");
+                    else if (ready) flushLocked();
+                }
+                notifyMedia();
             }
         }
     }
@@ -694,7 +808,7 @@ public final class TtsController {
                 break;
             }
         }
-        if (interrupted || !ready || tts == null || !inFlight) {
+        if (blockedLocked() || !ready || tts == null || !inFlight) {
             stallTicks = 0;
             return;
         }

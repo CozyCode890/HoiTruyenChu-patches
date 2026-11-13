@@ -11,6 +11,8 @@ internal object Constants {
     const val EXTENSION_AUTO_SYNC = "$EXTENSION_PATCHES/sync/AutoSyncPatch;"
     const val EXTENSION_CHAPTER_TITLES = "$EXTENSION_PATCHES/titles/ChapterTitlesPatch;"
     const val EXTENSION_FIX_GOOGLE_LOGIN = "$EXTENSION_PATCHES/login/FixGoogleLoginPatch;"
+    const val EXTENSION_TTS_MEDIA_SESSION = "$EXTENSION_PATCHES/media/TtsMediaSession;"
+    const val EXTENSION_RESUME_LISTENING = "$EXTENSION_PATCHES/resume/ResumeListeningPatch;"
 
     val COMPATIBILITY_ITRUYENCHU = Compatibility(
         name = "iTruyenChu",
