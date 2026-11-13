@@ -17,7 +17,7 @@ Click the button below, or manually add this repo url to Morphe Manager: https:/
 ## 🩹 Patches list
 
 <!-- PATCHES_START EXPANDED -->
-> **[v1.1.0](https://github.com/CozyCode890/HoiTruyenChu-patches/releases/tag/v1.1.0)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;7 patches total
+> **[v1.1.1](https://github.com/CozyCode890/HoiTruyenChu-patches/releases/tag/v1.1.1)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;7 patches total
 <details open>
 <summary>📦 iTruyenChu&nbsp;&nbsp;•&nbsp;&nbsp;7 patches</summary>
 <br>
@@ -36,7 +36,7 @@ Click the button below, or manually add this repo url to Morphe Manager: https:/
 | [Fix Google login](#fix-google-login) | Fixes "Đăng nhập với Google" failing with error 400: the server now expects the Firebase ID token (like the website) instead of the email sent by this app version. |  |
 | [Resume listening position](#resume-listening-position) | Opening a book from the bookshelf or "Đọc truyện" goes back to the line where the listening stopped: the voice bar opens with the play button and the line is highlighted, pressing play continues from there. |  |
 | [Show chapter titles](#show-chapter-titles) | Shows the real chapter titles instead of "Vô Đề Mục" in the chapter list, the reader and the TTS: books whose chapter list only has "Chương N" get the title from the first line of the chapter text (public preview, no login needed), cached on the device. |  |
-| [TTS media controls](#tts-media-controls) | The media widget / lock screen shows the TTS reading instead of the silent 6 s file of the voice bar: playing or paused, the position in the chapter (line x/y), and its play / pause buttons pause and resume the reading. |  |
+| [TTS media controls](#tts-media-controls) | The media widget / lock screen shows the TTS reading instead of the silent 6 s file of the voice bar: playing or paused, the position in the chapter (line x/y). Its play / pause and next / previous buttons work like the voice bar's buttons (next / previous chapter), and the previous chapter button of the voice bar, which did nothing, opens the previous chapter. |  |
 | [TTS reliability](#tts-reliability) | Fixes text-to-speech reading that stops after a phone call or does nothing when pressing play: re-creates the TTS engine when it dies, pauses during calls and resumes afterwards, retries failed lines, uses the correct Vietnamese voice, and applies a new speed right away instead of after pause + play. |  |
 
 </details>

@@ -1,3 +1,9 @@
+## [1.1.1](https://github.com/CozyCode890/HoiTruyenChu-patches/compare/v1.1.0...v1.1.1) (2026-11-13)
+
+### 🐛 Bug Fixes
+
+* voice bar previous button, widget play and next/previous ([0cec89f](https://github.com/CozyCode890/HoiTruyenChu-patches/commit/0cec89f74963196bb5647501d6614a3a16d234a9))
+
 ## [1.1.0](https://github.com/CozyCode890/HoiTruyenChu-patches/compare/v1.0.1...v1.1.0) (2026-11-13)
 
 ### ✨ New Features
