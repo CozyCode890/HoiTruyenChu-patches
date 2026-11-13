@@ -3,8 +3,13 @@ package app.hoitruyenchu.patches.itruyenchu.misc.sync
 import app.hoitruyenchu.patches.itruyenchu.misc.extension.sharedExtensionPatch
 import app.hoitruyenchu.patches.itruyenchu.shared.Constants.COMPATIBILITY_ITRUYENCHU
 import app.hoitruyenchu.patches.itruyenchu.shared.Constants.EXTENSION_AUTO_SYNC
+import app.hoitruyenchu.patches.itruyenchu.shared.ASYNC_STORAGE_MODULE
+import app.hoitruyenchu.patches.itruyenchu.shared.AsyncStorageConstructorFingerprint
+import app.hoitruyenchu.patches.itruyenchu.shared.AsyncStorageMultiGetFingerprint
+import app.hoitruyenchu.patches.itruyenchu.shared.AsyncStorageMultiSetFingerprint
 import app.hoitruyenchu.patches.itruyenchu.shared.CreateClientBuilderFingerprint
 import app.hoitruyenchu.patches.itruyenchu.shared.OKHTTP_CLIENT_BUILDER
+import app.hoitruyenchu.patches.itruyenchu.shared.READABLE_ARRAY
 import app.morphe.patcher.extensions.InstructionExtensions.addInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions

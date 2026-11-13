@@ -11,6 +11,10 @@ import android.speech.tts.UtteranceProgressListener;
 import android.speech.tts.Voice;
 import android.util.Log;
 
+import com.facebook.react.bridge.ReadableArray;
+
+import org.json.JSONObject;
+
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -37,6 +41,10 @@ import java.util.Set;
  *   <li>React Native pauses JS timers (including requestAnimationFrame) when the activity pauses,
  *       which stops the app from starting the next chapter with the screen off. While a reading
  *       session is active the pause of the timer manager is deferred.</li>
+ *   <li>Changing the speed in the voice bar while reading had no effect until pause + play: the
+ *       reading chain (speakLine -> onDone -> speakLine) keeps the speed of the render in which play
+ *       was pressed. Here the speed saved by the voice bar store is used for every line, and the
+ *       current line is started again at the new speed.</li>
  * </ul>
  * All public static methods are called from patched smali.
  */
@@ -92,6 +100,8 @@ public final class TtsController {
     private static final LinkedHashMap<String, Utterance> pending = new LinkedHashMap<>();
     /** Utterances stopped by us (call interruption) whose onStop must not reach JS. */
     private static final Set<String> suppressStop = new HashSet<>();
+    /** Utterances stopped by us after a speed change and already sent again: drop the old one's onStop/onError. */
+    private static final Set<String> respoken = new HashSet<>();
 
     // Engine settings already applied to the current engine instance.
     private static Float appliedPitch;
@@ -99,6 +109,11 @@ public final class TtsController {
     private static Locale appliedLocale;
     private static String appliedVoice;
     private static final Map<String, Locale> resolvedLocales = new HashMap<>();
+
+    /** AsyncStorage key of the voice bar store (useTTSVoiceStore). */
+    private static final String KEY_VOICE_STATE = "tts_voice_state";
+    /** Speed last saved by the voice bar, null until it saves one. */
+    private static Float chosenRate;
 
     private static boolean interrupted;
     private static int normalModeTicks;
@@ -156,6 +171,7 @@ public final class TtsController {
         synchronized (lock) {
             pending.clear();
             suppressStop.clear();
+            respoken.clear();
             interrupted = false;
             normalModeTicks = 0;
             stallTicks = 0;
@@ -165,6 +181,52 @@ public final class TtsController {
         } catch (Throwable t) {
             Log.w(TAG, "stop failed", t);
             return TextToSpeech.ERROR;
+        }
+    }
+
+    /**
+     * Start of AsyncStorageModule.multiSet([[key, value], ...]). The voice bar store is saved as
+     * {"state":{"spead":1.5,"isVoiceBarOpen":true},"version":0} ("spead" sic) whenever it changes.
+     */
+    public static void onStorageSet(ReadableArray pairs) {
+        try {
+            if (pairs == null) return;
+            for (int i = 0; i < pairs.size(); i++) {
+                ReadableArray pair = pairs.getArray(i);
+                if (pair == null || pair.size() < 2 || pair.isNull(0) || pair.isNull(1)) continue;
+                if (!KEY_VOICE_STATE.equals(pair.getString(0))) continue;
+                JSONObject state = new JSONObject(pair.getString(1)).optJSONObject("state");
+                if (state == null) continue;
+                Object speed = state.has("speed") ? state.opt("speed") : state.opt("spead");
+                if (speed instanceof Number) onSpeedChosen(((Number) speed).floatValue());
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "onStorageSet failed", t);
+        }
+    }
+
+    private static void onSpeedChosen(float rate) {
+        if (!(rate > 0) || rate > 10) return;
+        synchronized (lock) {
+            Float previous = chosenRate != null ? chosenRate : appliedRate;
+            chosenRate = rate;
+            if (previous == null || previous == rate) return;
+            Log.i(TAG, "speed changed to " + rate);
+            if (tts == null || !ready || interrupted) return;
+            // Speak the current line again at the new speed (the engine cannot change it mid-line).
+            boolean restart = false;
+            for (Utterance u : pending.values()) {
+                if (!u.sent) continue;
+                respoken.add(u.id);
+                u.sent = false;
+                restart = true;
+            }
+            if (!restart) return;
+            try {
+                tts.stop();
+            } catch (Throwable ignored) {
+            }
+            flushLocked();
         }
     }
 
@@ -213,6 +275,7 @@ public final class TtsController {
             }
             pending.clear();
             suppressStop.clear();
+            respoken.clear();
             interrupted = false;
         }
         try {
@@ -271,6 +334,7 @@ public final class TtsController {
         resolvedLocales.clear();
         for (Utterance u : pending.values()) u.sent = false;
         suppressStop.clear();
+        respoken.clear();
 
         if (old != null) {
             try {
@@ -382,9 +446,10 @@ public final class TtsController {
             tts.setPitch(u.pitch);
             appliedPitch = u.pitch;
         }
-        if (u.rate != null && !u.rate.equals(appliedRate)) {
-            tts.setSpeechRate(u.rate);
-            appliedRate = u.rate;
+        Float rate = chosenRate != null ? chosenRate : u.rate;
+        if (rate != null && !rate.equals(appliedRate)) {
+            tts.setSpeechRate(rate);
+            appliedRate = rate;
         }
         Locale locale = resolveLocaleLocked(u.language);
         boolean localeChanged = !locale.equals(appliedLocale);
@@ -466,6 +531,7 @@ public final class TtsController {
             synchronized (lock) {
                 pending.remove(id);
                 suppressStop.remove(id);
+                respoken.remove(id);
                 touchLocked();
             }
             UtteranceProgressListener l = appListener;
@@ -476,7 +542,7 @@ public final class TtsController {
         public void onStop(String id, boolean wasInterrupted) {
             if (stale()) return;
             synchronized (lock) {
-                if (suppressStop.remove(id)) return;
+                if (respoken.remove(id) || suppressStop.remove(id)) return;
                 pending.remove(id);
             }
             UtteranceProgressListener l = appListener;
@@ -505,6 +571,7 @@ public final class TtsController {
     private static void handleError(final int gen, String id, final int code) {
         synchronized (lock) {
             if (gen != generation) return;
+            if (respoken.remove(id)) return;
             Utterance u = pending.get(id);
             if (u != null) {
                 if (interrupted || suppressStop.remove(id)) {

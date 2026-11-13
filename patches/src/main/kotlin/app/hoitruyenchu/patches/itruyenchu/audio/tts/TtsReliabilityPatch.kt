@@ -1,8 +1,10 @@
 package app.hoitruyenchu.patches.itruyenchu.audio.tts
 
 import app.hoitruyenchu.patches.itruyenchu.misc.extension.sharedExtensionPatch
+import app.hoitruyenchu.patches.itruyenchu.shared.AsyncStorageMultiSetFingerprint
 import app.hoitruyenchu.patches.itruyenchu.shared.Constants.COMPATIBILITY_ITRUYENCHU
 import app.hoitruyenchu.patches.itruyenchu.shared.Constants.EXTENSION_TTS_CONTROLLER
+import app.hoitruyenchu.patches.itruyenchu.shared.READABLE_ARRAY
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
@@ -38,7 +40,8 @@ val ttsReliabilityPatch = patch(
     name = "TTS reliability",
     description = "Fixes text-to-speech reading that stops after a phone call or does nothing when pressing play: " +
             "re-creates the TTS engine when it dies, pauses during calls and resumes afterwards, " +
-            "retries failed lines, and uses the correct Vietnamese voice.",
+            "retries failed lines, uses the correct Vietnamese voice, and applies a new speed right away " +
+            "instead of after pause + play.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_ITRUYENCHU)
@@ -130,5 +133,12 @@ val ttsReliabilityPatch = patch(
                 )
             }
         }
+
+        // 7. A new speed chosen in the voice bar is used right away (JS keeps the old one until
+        //    pause + play): TtsController reads it from the saved voice bar store.
+        AsyncStorageMultiSetFingerprint.method.addInstructions(
+            0,
+            "invoke-static { p1 }, $EXTENSION_TTS_CONTROLLER->onStorageSet($READABLE_ARRAY)V",
+        )
     }
 }
