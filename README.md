@@ -77,7 +77,9 @@ native modules it uses (expo-speech, React Native timers, AsyncStorage) instead 
   the login token (`GET /chapters/{slug}/content/{n}`). The app (and the website) only do that for chapter 51
   and later; chapters 1–50 come from a public URL (`/free/{slug}/chuong-{n}.txt`) and are never recorded.
   The recorded progress (`POST /users/sync-books-new` -> `{slug: chapter}`) was only pulled when pressing the
-  sync button. (`POST /users/sync-books`, used by the history screen button, now answers HTTP 500.)
+  sync button. (`POST /users/sync-books`, used by the history screen button, now answers HTTP 500: the patch
+  sends that request to `sync-books-new`, records on the server the books read further on the device, and answers
+  the merged history, oldest first, since the button re-adds the entries one by one in front.)
 - **Google login**: the app signs in to Firebase, then sends `POST /auth/login-firebase {email}`.
   The server (and the website) now use `{idToken: firebaseUser.getIdToken()}`, so the app gets 400.
   The patch adds an interceptor to React Native's OkHttp client that keeps the Firebase ID token from
