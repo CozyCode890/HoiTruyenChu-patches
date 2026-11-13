@@ -17,14 +17,27 @@ Click the button below, or manually add this repo url to Morphe Manager: https:/
 ## 🩹 Patches list
 
 <!-- PATCHES_START EXPANDED -->
+> **[v1.0.0](https://github.com/CozyCode890/HoiTruyenChu-patches/releases/tag/v1.0.0)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;5 patches total
+<details open>
+<summary>📦 iTruyenChu&nbsp;&nbsp;•&nbsp;&nbsp;5 patches</summary>
+<br>
 
-| Patch | Description |
-|---|---|
-| TTS reliability | Re-creates the TTS engine when it dies, pauses during calls and resumes afterwards, retries failed lines, uses the correct Vietnamese voice, applies a new speed right away instead of after pause + play. |
-| Background reading | Keeps reading (and moving to the next chapter) with the screen off. |
-| Fix Google login | "Đăng nhập với Google" failed with error 400: the server now expects the Firebase ID token (like the website) instead of the email this app version sends. |
-| Show chapter titles | Shows the real chapter titles instead of "Vô Đề Mục" in the chapter list, the reader and the TTS, taken from the first line of each chapter's public preview and cached on the device. |
-| Auto sync reading history | Records free chapters 1–50 on the server (it only saw chapter 51+) and merges the progress from your other devices, with book titles, when the app starts, without pressing "Đồng bộ". |
+**Package name:** `com.ngoctieucac.itruyenchu`
+
+**🎯 Supported versions:**
+
+| 2.1.0 |
+| :---: |
+
+| 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
+|----------|----------------|-----------|
+| [Auto sync reading history](#auto-sync-reading-history) | Syncs the reading history with the iTruyenChu account without pressing the sync button: free chapters 1-50, which the server never sees, are recorded too, and the progress from other devices is merged in (with book titles) when the app starts. |  |
+| [Background reading](#background-reading) | Keeps reading with the screen off: React Native pauses JS timers when the app goes to the background, which stops the app from starting the next chapter. JS timers keep running while a reading session is active. |  |
+| [Fix Google login](#fix-google-login) | Fixes "Đăng nhập với Google" failing with error 400: the server now expects the Firebase ID token (like the website) instead of the email sent by this app version. |  |
+| [Show chapter titles](#show-chapter-titles) | Shows the real chapter titles instead of "Vô Đề Mục" in the chapter list, the reader and the TTS: books whose chapter list only has "Chương N" get the title from the first line of the chapter text (public preview, no login needed), cached on the device. |  |
+| [TTS reliability](#tts-reliability) | Fixes text-to-speech reading that stops after a phone call or does nothing when pressing play: re-creates the TTS engine when it dies, pauses during calls and resumes afterwards, retries failed lines, uses the correct Vietnamese voice, and applies a new speed right away instead of after pause + play. |  |
+
+</details>
 
 <!-- PATCHES_END -->
 
