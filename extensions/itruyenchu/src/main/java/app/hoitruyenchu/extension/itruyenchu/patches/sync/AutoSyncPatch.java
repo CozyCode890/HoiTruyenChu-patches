@@ -3,6 +3,7 @@ package app.hoitruyenchu.extension.itruyenchu.patches.sync;
 import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
+import android.net.Uri;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.util.Log;
@@ -12,6 +13,7 @@ import com.facebook.react.bridge.ReadableArray;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.InputStream;
@@ -23,31 +25,42 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.zip.GZIPInputStream;
+
+import okhttp3.OkHttpClient;
 
 /**
  * Automatic sync of the reading history ("Lịch sử đọc") with the iTruyenChu account.
  * <p>
- * How the stock app works (from the Hermes bundle, app 2.1.0):
+ * How the stock app and the server work (from the Hermes bundle of app 2.1.0 and the website code):
  * <ul>
  *   <li>The reading history is a zustand store persisted in AsyncStorage under the key {@code read}:
  *       {@code {"state":{"recentReads":[{slug,title,categories,currentChapter,totalChapter,chapterTitle}]},"version":0}}.
  *       The reader only updates this local store.</li>
  *   <li>The login is persisted under {@code auth-storage}: {@code {"state":{"user":{..},"accessToken":".."}}}.</li>
- *   <li>The server only learns about a chapter when it is downloaded with the token, which the app does
- *       for chapter 51 and later. Chapters 1-50 come from a public URL without the token.
- *       That is why the history sometimes syncs and sometimes does not.</li>
- *   <li>A full sync only happens when pressing "Đồng bộ" in the history screen:
- *       {@code POST /users/sync-books {recentReads}} uploads the local list and the response
- *       ({@code data.recentReads}) replaces the local list.</li>
+ *   <li>The server records the progress itself whenever a chapter is downloaded with the token
+ *       ({@code GET /chapters/{slug}/content/{n}}). The app (and the website) only do that for chapter 51
+ *       and later; chapters 1-50 come from a public URL ({@code STATIC_URL/free/{slug}/chuong-{n}.txt}),
+ *       so they are never recorded. That is why the sync sometimes works and sometimes does not.</li>
+ *   <li>{@code POST /users/sync-books-new} returns the recorded progress as {@code {slug: chapter}};
+ *       the app only calls it from the sync button. ({@code POST /users/sync-books}, used by the
+ *       history screen button, now fails with HTTP 500 and is not used by the website.)</li>
  * </ul>
- * This class does the same automatically, from the native side of AsyncStorage:
+ * This class:
  * <ul>
- *   <li>Every write of {@code read} (chapter change) uploads the history a few seconds later.</li>
- *   <li>On app start the history is uploaded and the server answer is merged into the stored history
- *       before the app loads it, so history read on other devices shows up without pressing anything.</li>
+ *   <li>When the app downloads a free chapter, downloads it once more with the token
+ *       (in the background, the answer is ignored) so the server records it like any other chapter.</li>
+ *   <li>On app start pulls the recorded progress and merges it into the stored history before the
+ *       app loads it, so history read on other devices shows up without pressing anything.</li>
+ *   <li>Entries that only have a slug and a chapter get their title, categories and number of
+ *       chapters from the public book info file.</li>
  * </ul>
  * All public static methods are called from patched smali.
  */
@@ -56,9 +69,13 @@ public final class AutoSyncPatch {
     private static final String TAG = "HTC-Sync";
 
     private static final String API_URL = "https://api.tienphu.top";
-    private static final String SYNC_PATH = "/users/sync-books";
-    /** Returns the server history as {slug: chapter}, used when there is no local history to upload. */
+    /** Returns the progress recorded by the server as {slug: chapter}. */
     private static final String PULL_PATH = "/users/sync-books-new";
+
+    /** Public files (book info). The app's STATIC_URL first, the website's as fallback. */
+    private static final String[] STATIC_URLS = {"https://assets.tienphu.top", "https://assets.hoitruyenchu.org"};
+    private static final int BOOK_INFO_TIMEOUT_MS = 2_000;
+    private static final long BOOK_INFO_BUDGET_MS = 2_500;
 
     private static final String KEY_READ = "read";
     private static final String KEY_AUTH = "auth-storage";
@@ -67,9 +84,8 @@ public final class AutoSyncPatch {
 
     /** Same limit as the app (addRecentRead keeps 20 entries). */
     private static final int MAX_ITEMS = 20;
-    private static final long UPLOAD_DELAY_MS = 3_000;
     /** How long loading the history may wait for the startup sync. */
-    private static final long STARTUP_WAIT_MS = 3_500;
+    private static final long STARTUP_WAIT_MS = 4_500;
     private static final int STARTUP_TIMEOUT_MS = 3_000;
     private static final int TIMEOUT_MS = 15_000;
 
@@ -77,18 +93,15 @@ public final class AutoSyncPatch {
     private static Context appContext;
     private static Handler worker;
 
-    /** Latest values persisted by the app. */
+    /** Login token persisted by the app. */
     private static volatile String token;
-    private static volatile String readValue;
-    /** recentReads last accepted by the server, to skip redundant uploads. */
-    private static String lastUploaded;
+    /** Last free chapter recorded, "slug/chapter", to skip duplicates. */
+    private static String lastRecorded;
 
     private static final CountDownLatch startupDone = new CountDownLatch(1);
     /** New value for {@code read} computed by the startup sync, written before the app loads it. */
     private static volatile String startupMerged;
     private static boolean historyLoadSeen;
-
-    private static final Runnable uploadTask = AutoSyncPatch::upload;
 
     private AutoSyncPatch() {
     }
@@ -99,13 +112,10 @@ public final class AutoSyncPatch {
     /** End of the AsyncStorageModule constructor. */
     public static void onStorageCreated(Context context) {
         synchronized (lock) {
-            if (worker != null || context == null) return;
+            if (appContext != null || context == null) return;
             Context app = context.getApplicationContext();
             appContext = app != null ? app : context;
-            HandlerThread thread = new HandlerThread("HTC-Sync");
-            thread.start();
-            worker = new Handler(thread.getLooper());
-            worker.post(AutoSyncPatch::startupSync);
+            workerLocked().post(AutoSyncPatch::startupSync);
         }
     }
 
@@ -132,7 +142,6 @@ public final class AutoSyncPatch {
                         startupMerged = null;
                     }
                     if (merged != null && writeDb(KEY_READ, merged)) {
-                        readValue = merged;
                         Log.i(TAG, "merged server history into the local history");
                     }
                 } catch (Throwable t) {
@@ -144,42 +153,70 @@ public final class AutoSyncPatch {
         }
     }
 
-    /** Start of AsyncStorageModule.multiSet([[key, value], ...]). */
+    /** Start of AsyncStorageModule.multiSet([[key, value], ...]): keeps track of the login. */
     public static void onStorageSet(ReadableArray pairs) {
         try {
             if (pairs == null) return;
-            boolean upload = false;
             for (int i = 0; i < pairs.size(); i++) {
                 ReadableArray pair = pairs.getArray(i);
                 if (pair == null || pair.size() < 2 || pair.isNull(0)) continue;
-                String key = pair.getString(0);
-                String value = pair.isNull(1) ? null : pair.getString(1);
-                if (KEY_READ.equals(key)) {
-                    readValue = value;
-                    upload = true;
-                } else if (KEY_AUTH.equals(key)) {
-                    String newToken = tokenFrom(value);
-                    if (newToken != null && !newToken.equals(token)) upload = true; // just logged in
-                    token = newToken;
+                if (KEY_AUTH.equals(pair.getString(0))) {
+                    token = tokenFrom(pair.isNull(1) ? null : pair.getString(1));
                 }
             }
-            if (upload) scheduleUpload();
         } catch (Throwable t) {
             Log.w(TAG, "onStorageSet failed", t);
         }
     }
 
     // ---------------------------------------------------------------------------------------------
+    // Hook called from com.facebook.react.modules.network.OkHttpClientProvider.createClientBuilder()
+
+    public static void onCreateClientBuilder(OkHttpClient.Builder builder) {
+        try {
+            if (builder != null) builder.addInterceptor(new FreeChapterInterceptor());
+        } catch (Throwable t) {
+            Log.e(TAG, "could not add interceptor", t);
+        }
+    }
+
+    /** Called by FreeChapterInterceptor after the app downloaded STATIC_URL/free/{slug}/chuong-{n}.txt. */
+    static void onFreeChapterLoaded(final String slug, final int chapter) {
+        if (token == null) return;
+        final String key = slug + "/" + chapter;
+        synchronized (lock) {
+            if (key.equals(lastRecorded)) return;
+            lastRecorded = key;
+            workerLocked().post(() -> recordChapter(slug, chapter));
+        }
+    }
+
+    // ---------------------------------------------------------------------------------------------
     // Sync
 
-    private static void scheduleUpload() {
-        Handler handler;
-        synchronized (lock) {
-            handler = worker;
+    private static Handler workerLocked() {
+        if (worker == null) {
+            HandlerThread thread = new HandlerThread("HTC-Sync");
+            thread.start();
+            worker = new Handler(thread.getLooper());
         }
-        if (handler == null) return;
-        handler.removeCallbacks(uploadTask);
-        handler.postDelayed(uploadTask, UPLOAD_DELAY_MS);
+        return worker;
+    }
+
+    /** Downloads the chapter with the token, the way the app does for chapter 51+, so the server records it. */
+    private static void recordChapter(String slug, int chapter) {
+        String currentToken = token;
+        if (currentToken == null) return;
+        String url = API_URL + "/chapters/" + Uri.encode(slug) + "/content/" + chapter;
+        int code = request("GET", url, null, currentToken, TIMEOUT_MS, null);
+        if (code >= 200 && code < 300) {
+            Log.i(TAG, "recorded chapter " + chapter + " of " + slug);
+        } else {
+            Log.w(TAG, "recording chapter " + chapter + " of " + slug + " -> HTTP " + code);
+            synchronized (lock) {
+                if ((slug + "/" + chapter).equals(lastRecorded)) lastRecorded = null; // retry next time
+            }
+        }
     }
 
     /** Runs on the worker thread, before the app loads its history. */
@@ -187,57 +224,32 @@ public final class AutoSyncPatch {
         try {
             token = tokenFrom(readDb(KEY_AUTH));
             String stored = readDb(KEY_READ);
-            readValue = stored;
+            JSONArray local = recentReadsFrom(stored);
+            JSONArray remote = null;
             if (token == null) {
-                Log.i(TAG, "not logged in, nothing to sync");
+                Log.i(TAG, "not logged in, nothing to pull");
+            } else {
+                JSONObject response = post(PULL_PATH, null, STARTUP_TIMEOUT_MS);
+                if (response != null) remote = itemsFrom(response.opt("recentReads"));
+            }
+            int remoteCount = remote == null ? 0 : remote.length();
+            // merge() and fillBookInfo() work on the local entry objects: compare with a snapshot.
+            String before = local.toString();
+            JSONArray merged = merge(new JSONArray(before), remote == null ? new JSONArray() : remote);
+            int filled = fillBookInfo(merged);
+            if (merged.toString().equals(before)) {
+                Log.i(TAG, "startup sync: local=" + local.length() + " server=" + remoteCount + ", nothing new");
                 return;
             }
-            JSONArray local = recentReadsFrom(stored);
-            JSONArray remote;
-            if (local.length() > 0) {
-                JSONObject body = new JSONObject().put("recentReads", local);
-                JSONObject response = post(SYNC_PATH, body, STARTUP_TIMEOUT_MS);
-                if (response == null) return;
-                lastUploaded = local.toString();
-                remote = itemsFrom(response.opt("recentReads"));
-            } else {
-                // Never upload an empty list. Ask for the server history instead (the profile sync button).
-                JSONObject response = post(PULL_PATH, null, STARTUP_TIMEOUT_MS);
-                if (response == null) return;
-                remote = itemsFrom(response.opt("recentReads"));
-            }
-            if (remote == null || remote.length() == 0) return;
-
-            JSONArray merged = merge(local, remote);
-            if (merged.toString().equals(local.toString())) return;
             synchronized (lock) {
                 startupMerged = withRecentReads(stored, merged);
             }
-            Log.i(TAG, "startup sync: local=" + local.length() + " server=" + remote.length()
-                    + " merged=" + merged.length());
+            Log.i(TAG, "startup sync: local=" + local.length() + " server=" + remoteCount
+                    + " merged=" + merged.length() + " filled=" + filled);
         } catch (Throwable t) {
             Log.w(TAG, "startup sync failed", t);
         } finally {
             startupDone.countDown();
-        }
-    }
-
-    /** Runs on the worker thread a few seconds after the history changed. */
-    private static void upload() {
-        try {
-            String currentToken = token;
-            if (currentToken == null) return;
-            JSONArray local = recentReadsFrom(readValue);
-            if (local.length() == 0) return;
-            String json = local.toString();
-            if (json.equals(lastUploaded)) return;
-            JSONObject response = post(SYNC_PATH, new JSONObject().put("recentReads", local), TIMEOUT_MS);
-            if (response != null) {
-                lastUploaded = json;
-                Log.i(TAG, "uploaded " + local.length() + " history entries");
-            }
-        } catch (Throwable t) {
-            Log.w(TAG, "upload failed", t);
         }
     }
 
@@ -278,6 +290,122 @@ public final class AutoSyncPatch {
         JSONArray result = new JSONArray();
         for (int i = 0; i < items.size() && i < MAX_ITEMS; i++) result.put(items.get(i));
         return result;
+    }
+
+    /**
+     * Entries pulled from the server only have a slug and a chapter (sync-books-new returns
+     * {slug: chapter}), so the history shows "100 %" and no chapter title. Fill them from the public
+     * files the app itself uses, like the reader does when a chapter is opened:
+     * <ul>
+     *   <li>title, categories, totalChapter (= released chapters) from {@code STATIC_URL/books/{slug}.json}
+     *       (getBookBySlug), when the title is missing or totalChapter is not above the current chapter;</li>
+     *   <li>chapterTitle from the chapter list {@code STATIC_URL/chapters/{slug}.json.gz}
+     *       ({@code {"92": {"title": ..}}}, fetchChapters), when it is missing.</li>
+     * </ul>
+     *
+     * @return number of entries changed.
+     */
+    static int fillBookInfo(JSONArray items) {
+        List<JSONObject> missing = new ArrayList<>();
+        for (int i = 0; i < items.length(); i++) {
+            JSONObject item = items.optJSONObject(i);
+            if (item == null || item.optString("slug", "").isEmpty()) continue;
+            if (needsBookInfo(item) || isEmpty(item.opt("chapterTitle"))) missing.add(item);
+        }
+        if (missing.isEmpty()) return 0;
+        try {
+            return fillBookInfo(missing);
+        } finally {
+            // The history screen divides by totalChapter: never leave it empty.
+            for (JSONObject item : missing) {
+                try {
+                    if (isEmpty(item.opt("totalChapter"))) item.put("totalChapter", item.opt("currentChapter"));
+                } catch (Throwable ignored) {
+                }
+            }
+        }
+    }
+
+    /** Title missing, or totalChapter missing / not above the current chapter (shows 100 %). */
+    private static boolean needsBookInfo(JSONObject item) {
+        if (isEmpty(item.opt("title")) || isEmpty(item.opt("totalChapter"))) return true;
+        Object total = item.opt("totalChapter");
+        double totalChapters = total instanceof Number ? ((Number) total).doubleValue() : parseDouble(total);
+        return totalChapters <= chapterOf(item);
+    }
+
+    private static int fillBookInfo(List<JSONObject> missing) {
+        ExecutorService pool = Executors.newFixedThreadPool(Math.min(4, missing.size()));
+        try {
+            List<Callable<JSONObject>> tasks = new ArrayList<>();
+            for (JSONObject item : missing) {
+                // Tasks only read copies, so an abandoned (timed out) task never touches the list.
+                final JSONObject copy = new JSONObject(item.toString());
+                tasks.add(() -> lookUp(copy));
+            }
+            List<Future<JSONObject>> results = pool.invokeAll(tasks, BOOK_INFO_BUDGET_MS, TimeUnit.MILLISECONDS);
+            int filled = 0;
+            for (int i = 0; i < missing.size(); i++) {
+                JSONObject updates;
+                try {
+                    updates = results.get(i).get();
+                } catch (Throwable t) {
+                    Log.w(TAG, "book info " + missing.get(i).optString("slug") + " timed out");
+                    continue;
+                }
+                if (updates.length() == 0) continue;
+                JSONObject item = missing.get(i);
+                Iterator<String> fields = updates.keys();
+                while (fields.hasNext()) {
+                    String field = fields.next();
+                    item.put(field, updates.get(field));
+                }
+                filled++;
+            }
+            return filled;
+        } catch (Throwable t) {
+            Log.w(TAG, "filling book info failed: " + t);
+            return 0;
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    /** Fetches what one entry lacks. @return the fields to update (empty if nothing found). */
+    private static JSONObject lookUp(JSONObject item) throws Exception {
+        String slug = item.optString("slug");
+        JSONObject updates = new JSONObject();
+        if (needsBookInfo(item)) {
+            JSONObject book = getPublicJson("/books/" + Uri.encode(slug) + ".json", "book info " + slug);
+            if (book != null && !isEmpty(book.opt("title"))) {
+                if (isEmpty(item.opt("title"))) updates.put("title", book.getString("title"));
+                JSONArray categories = book.optJSONArray("categories");
+                if (categories != null && isEmpty(item.opt("categories"))) updates.put("categories", categories);
+                // Same mapping as the reader: totalChapter = book.currentChapter (released chapters).
+                if (chapterOf(book) >= chapterOf(item)) updates.put("totalChapter", book.get("currentChapter"));
+            }
+        }
+        if (isEmpty(item.opt("chapterTitle"))) {
+            JSONObject chapters = getPublicJson("/chapters/" + Uri.encode(slug) + ".json.gz", "chapter list " + slug);
+            JSONObject chapter = chapters == null ? null : chapters.optJSONObject(chapterKey(item));
+            String title = chapter == null ? "" : chapter.optString("title", "");
+            if (!title.isEmpty()) updates.put("chapterTitle", title);
+        }
+        return updates;
+    }
+
+    /** "92" for currentChapter 92 (or 92.0 / "92"). */
+    private static String chapterKey(JSONObject item) {
+        double chapter = chapterOf(item);
+        return chapter == Math.rint(chapter) ? String.valueOf((long) chapter) : String.valueOf(chapter);
+    }
+
+    private static double parseDouble(Object value) {
+        try {
+            return value == null ? 0 : Double.parseDouble(value.toString());
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -338,7 +466,6 @@ public final class AutoSyncPatch {
             Object chapter = map.get(slug);
             items.put(new JSONObject()
                     .put("slug", slug)
-                    .put("totalChapter", chapter)
                     .put("title", "")
                     .put("categories", new JSONArray())
                     .put("currentChapter", chapter)
@@ -405,48 +532,95 @@ public final class AutoSyncPatch {
     // ---------------------------------------------------------------------------------------------
     // Network
 
-    /** @return the JSON response, or null if the request failed. */
+    /** Authenticated POST to the API. @return the JSON response, or null if the request failed. */
     private static JSONObject post(String path, JSONObject body, int timeoutMs) {
         String currentToken = token;
         if (currentToken == null) return null;
-        HttpURLConnection connection = null;
+        ByteArrayOutputStream response = new ByteArrayOutputStream();
+        int code = request("POST", API_URL + path, body == null ? "" : body.toString(), currentToken, timeoutMs, response);
+        if (code < 200 || code >= 300) {
+            Log.w(TAG, "POST " + path + " -> HTTP " + code);
+            return null;
+        }
         try {
-            connection = (HttpURLConnection) new URL(API_URL + path).openConnection();
-            connection.setRequestMethod("POST");
-            connection.setConnectTimeout(timeoutMs);
-            connection.setReadTimeout(timeoutMs);
-            connection.setRequestProperty("Authorization", "Bearer " + currentToken);
-            connection.setRequestProperty("Accept", "application/json");
-            byte[] payload = body == null ? new byte[0] : body.toString().getBytes(StandardCharsets.UTF_8);
-            connection.setRequestProperty("Content-Type", "application/json");
-            connection.setDoOutput(true);
-            connection.setFixedLengthStreamingMode(payload.length);
-            try (OutputStream out = connection.getOutputStream()) {
-                out.write(payload);
-            }
-            int code = connection.getResponseCode();
-            if (code < 200 || code >= 300) {
-                Log.w(TAG, "POST " + path + " -> HTTP " + code);
-                return null;
-            }
-            String text = readAll(connection.getInputStream());
+            String text = new String(response.toByteArray(), StandardCharsets.UTF_8);
             return text.isEmpty() ? new JSONObject() : new JSONObject(text);
         } catch (Throwable t) {
-            Log.w(TAG, "POST " + path + " failed: " + t);
+            Log.w(TAG, "POST " + path + ": unexpected answer");
             return null;
+        }
+    }
+
+    /**
+     * @param body     request body (sent as JSON), or null for none.
+     * @param token    login token, or null for a public request.
+     * @param response receives the response body when not null.
+     * @return the HTTP status, or -1 if the request failed.
+     */
+    private static int request(String method, String url, String body, String token, int timeoutMs,
+                               ByteArrayOutputStream response) {
+        HttpURLConnection connection = null;
+        try {
+            connection = (HttpURLConnection) new URL(url).openConnection();
+            connection.setRequestMethod(method);
+            connection.setConnectTimeout(timeoutMs);
+            connection.setReadTimeout(timeoutMs);
+            connection.setRequestProperty("Accept", "application/json");
+            if (token != null) connection.setRequestProperty("Authorization", "Bearer " + token);
+            if (body != null) {
+                byte[] payload = body.getBytes(StandardCharsets.UTF_8);
+                connection.setRequestProperty("Content-Type", "application/json");
+                connection.setDoOutput(true);
+                connection.setFixedLengthStreamingMode(payload.length);
+                try (OutputStream out = connection.getOutputStream()) {
+                    out.write(payload);
+                }
+            }
+            int code = connection.getResponseCode();
+            if (code >= 200 && code < 300) {
+                try (InputStream input = connection.getInputStream()) {
+                    byte[] buffer = new byte[8192];
+                    int n;
+                    while ((n = input.read(buffer)) > 0) {
+                        if (response != null) response.write(buffer, 0, n);
+                    }
+                }
+            }
+            return code;
+        } catch (Throwable t) {
+            Log.w(TAG, method + " " + Uri.parse(url).getPath() + " failed: " + t);
+            return -1;
         } finally {
             if (connection != null) connection.disconnect();
         }
     }
 
-    private static String readAll(InputStream in) throws Exception {
-        try (InputStream input = in) {
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            byte[] buffer = new byte[8192];
-            int n;
-            while ((n = input.read(buffer)) > 0) out.write(buffer, 0, n);
-            return out.toString("UTF-8");
+    /** GET of a public JSON file (optionally gzipped). @return the JSON, or null. */
+    private static JSONObject getPublicJson(String path, String what) {
+        for (String host : STATIC_URLS) {
+            ByteArrayOutputStream response = new ByteArrayOutputStream();
+            int code = request("GET", host + path, null, null, BOOK_INFO_TIMEOUT_MS, response);
+            if (code < 200 || code >= 300) {
+                Log.w(TAG, what + " -> HTTP " + code);
+                continue;
+            }
+            try {
+                byte[] bytes = response.toByteArray();
+                if (bytes.length > 2 && (bytes[0] & 0xff) == 0x1f && (bytes[1] & 0xff) == 0x8b) {
+                    ByteArrayOutputStream unzipped = new ByteArrayOutputStream();
+                    try (InputStream in = new GZIPInputStream(new ByteArrayInputStream(bytes))) {
+                        byte[] buffer = new byte[8192];
+                        int n;
+                        while ((n = in.read(buffer)) > 0) unzipped.write(buffer, 0, n);
+                    }
+                    bytes = unzipped.toByteArray();
+                }
+                return new JSONObject(new String(bytes, StandardCharsets.UTF_8));
+            } catch (Throwable t) {
+                Log.w(TAG, what + ": unexpected answer");
+            }
         }
+        return null;
     }
 
     // ---------------------------------------------------------------------------------------------

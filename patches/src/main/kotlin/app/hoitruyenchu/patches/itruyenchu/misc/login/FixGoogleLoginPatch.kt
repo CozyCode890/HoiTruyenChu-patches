@@ -3,6 +3,8 @@ package app.hoitruyenchu.patches.itruyenchu.misc.login
 import app.hoitruyenchu.patches.itruyenchu.misc.extension.sharedExtensionPatch
 import app.hoitruyenchu.patches.itruyenchu.shared.Constants.COMPATIBILITY_ITRUYENCHU
 import app.hoitruyenchu.patches.itruyenchu.shared.Constants.EXTENSION_FIX_GOOGLE_LOGIN
+import app.hoitruyenchu.patches.itruyenchu.shared.CreateClientBuilderFingerprint
+import app.hoitruyenchu.patches.itruyenchu.shared.OKHTTP_CLIENT_BUILDER
 import app.morphe.patcher.extensions.InstructionExtensions.addInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
 import app.morphe.patcher.patch.patch

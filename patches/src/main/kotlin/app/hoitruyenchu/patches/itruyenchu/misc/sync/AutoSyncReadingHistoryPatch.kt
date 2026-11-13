@@ -3,18 +3,22 @@ package app.hoitruyenchu.patches.itruyenchu.misc.sync
 import app.hoitruyenchu.patches.itruyenchu.misc.extension.sharedExtensionPatch
 import app.hoitruyenchu.patches.itruyenchu.shared.Constants.COMPATIBILITY_ITRUYENCHU
 import app.hoitruyenchu.patches.itruyenchu.shared.Constants.EXTENSION_AUTO_SYNC
+import app.hoitruyenchu.patches.itruyenchu.shared.CreateClientBuilderFingerprint
+import app.hoitruyenchu.patches.itruyenchu.shared.OKHTTP_CLIENT_BUILDER
+import app.morphe.patcher.extensions.InstructionExtensions.addInstruction
+import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.patch
 import com.android.tools.smali.dexlib2.Opcode
+import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 
 @Suppress("unused")
 val autoSyncReadingHistoryPatch = patch(
     name = "Auto sync reading history",
-    description = "Syncs the reading history with the iTruyenChu account automatically, " +
-            "without pressing the sync button: every chapter change is uploaded " +
-            "(including the free chapters 1-50 that the server never sees), " +
-            "and history from other devices is merged in when the app starts.",
+    description = "Syncs the reading history with the iTruyenChu account without pressing the sync button: " +
+            "free chapters 1-50, which the server never sees, are recorded too, and the progress " +
+            "from other devices is merged in (with book titles) when the app starts.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_ITRUYENCHU)
@@ -48,10 +52,24 @@ val autoSyncReadingHistoryPatch = patch(
             """,
         )
 
-        // 3. Every write of the reading history (or of the login) schedules an upload.
+        // 3. Keep track of the login token.
         AsyncStorageMultiSetFingerprint.method.addInstructions(
             0,
             "invoke-static { p1 }, $EXTENSION_AUTO_SYNC->onStorageSet($READABLE_ARRAY)V",
         )
+
+        // 4. Free chapters (1-50) are downloaded without the token: record them on the server.
+        CreateClientBuilderFingerprint.method.apply {
+            val instructions = implementation!!.instructions.toList()
+            instructions.indices.reversed()
+                .filter { instructions[it].opcode == Opcode.RETURN_OBJECT }
+                .forEach { index ->
+                    val register = getInstruction<OneRegisterInstruction>(index).registerA
+                    addInstruction(
+                        index,
+                        "invoke-static { v$register }, $EXTENSION_AUTO_SYNC->onCreateClientBuilder($OKHTTP_CLIENT_BUILDER)V",
+                    )
+                }
+        }
     }
 }

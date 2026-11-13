@@ -22,7 +22,7 @@ Click the button below, or manually add this repo url to Morphe Manager: https:/
 | TTS reliability | Re-creates the TTS engine when it dies, pauses during calls and resumes afterwards, retries failed lines, uses the correct Vietnamese voice. |
 | Background reading | Keeps reading (and moving to the next chapter) with the screen off. |
 | Fix Google login | "Đăng nhập với Google" failed with error 400: the server now expects the Firebase ID token (like the website) instead of the email this app version sends. |
-| Auto sync reading history | Uploads the reading history after every chapter change and merges the history of your other devices when the app starts, without pressing "Đồng bộ". |
+| Auto sync reading history | Records free chapters 1–50 on the server (it only saw chapter 51+) and merges the progress from your other devices, with book titles, when the app starts, without pressing "Đồng bộ". |
 
 <!-- PATCHES_END -->
 
@@ -56,15 +56,19 @@ native modules it uses (expo-speech, React Native timers, AsyncStorage) instead 
 
 - **Reading history**: a zustand store persisted in AsyncStorage (`RKStorage` database) under the key `read`,
   the login under `auth-storage`. The reader only updates the local store.
-- **Why sync was unreliable**: the server only records a chapter when it is downloaded with the login token,
-  which the app does for chapter 51 and later. Chapters 1–50 come from a public URL without the token.
-  A full sync (`POST /users/sync-books`) only ran when pressing "Đồng bộ".
+- **Why sync was unreliable**: the server records the progress itself whenever a chapter is downloaded with
+  the login token (`GET /chapters/{slug}/content/{n}`). The app (and the website) only do that for chapter 51
+  and later; chapters 1–50 come from a public URL (`/free/{slug}/chuong-{n}.txt`) and are never recorded.
+  The recorded progress (`POST /users/sync-books-new` -> `{slug: chapter}`) was only pulled when pressing the
+  sync button. (`POST /users/sync-books`, used by the history screen button, now answers HTTP 500.)
 - **Google login**: the app signs in to Firebase, then sends `POST /auth/login-firebase {email}`.
   The server (and the website) now use `{idToken: firebaseUser.getIdToken()}`, so the app gets 400.
   The patch adds an interceptor to React Native's OkHttp client that keeps the Firebase ID token from
   `accounts:signInWithIdp` and sends it instead, then adds the profile to the answer if it has no `user`.
-- **Auto sync patch**: uploads the history 3 s after it changes, and on app start uploads it and merges
-  the server answer into the stored history before the app loads it (waits at most 3.5 s, offline-safe).
+- **Auto sync patch**: when a free chapter is downloaded, downloads it once more with the token in the background
+  so the server records it; on app start pulls the recorded progress and merges it into the stored history before
+  the app loads it (waits at most 4.5 s, offline-safe). Entries that only have a slug and a chapter get their title
+  and chapter count from the public `books/{slug}.json`, like the reader does.
 
 ## 🛠️ Building locally
 

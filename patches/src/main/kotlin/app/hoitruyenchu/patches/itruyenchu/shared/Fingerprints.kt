@@ -1,4 +1,4 @@
-package app.hoitruyenchu.patches.itruyenchu.misc.login
+package app.hoitruyenchu.patches.itruyenchu.shared
 
 import app.morphe.patcher.Fingerprint
 
