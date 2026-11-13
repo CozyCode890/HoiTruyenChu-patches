@@ -1,3 +1,9 @@
+## [1.0.1](https://github.com/CozyCode890/HoiTruyenChu-patches/compare/v1.0.0...v1.0.1) (2026-11-13)
+
+### 🐛 Bug Fixes
+
+* "Đồng bộ" button failing with HTTP 500 ([2c1e088](https://github.com/CozyCode890/HoiTruyenChu-patches/commit/2c1e08839a704c3e0c6938c729ff716303c46ef0))
+
 ## 1.0.0 (2026-11-13)
 
 ### ✨ New Features
