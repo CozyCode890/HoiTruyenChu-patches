@@ -2,7 +2,7 @@
 
 Morphe patches for **iTruyenChu** (`com.ngoctieucac.itruyenchu`), tested on version 2.1.0.
 
-They fix text-to-speech reading (stops with the screen off, after a phone call, play button doing nothing)
+They fix text-to-speech reading (stops with the screen off, after a phone call, play button doing nothing),
 fix Google login, and make the reading history sync with your account automatically.
 
 ### How to use these patches
