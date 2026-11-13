@@ -20,6 +20,10 @@ public final class Response implements java.io.Closeable {
         throw new UnsupportedOperationException("Stub");
     }
 
+    public String header(String name) {
+        throw new UnsupportedOperationException("Stub");
+    }
+
     public Builder newBuilder() {
         throw new UnsupportedOperationException("Stub");
     }
@@ -31,6 +35,10 @@ public final class Response implements java.io.Closeable {
 
     public static class Builder {
         public Builder body(ResponseBody body) {
+            throw new UnsupportedOperationException("Stub");
+        }
+
+        public Builder removeHeader(String name) {
             throw new UnsupportedOperationException("Stub");
         }
 

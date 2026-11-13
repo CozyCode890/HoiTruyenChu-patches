@@ -2,8 +2,9 @@
 
 Morphe patches for **iTruyenChu** (`com.ngoctieucac.itruyenchu`), tested on version 2.1.0.
 
-They fix text-to-speech reading (stops with the screen off, after a phone call, play button doing nothing),
-fix Google login, and make the reading history sync with your account automatically.
+They fix text-to-speech reading (stops with the screen off, after a phone call, play button doing nothing,
+speed change ignored until pause + play), fix Google login, show the real chapter titles instead of "Vô Đề Mục",
+and make the reading history sync with your account automatically.
 
 ### How to use these patches
 
@@ -19,9 +20,10 @@ Click the button below, or manually add this repo url to Morphe Manager: https:/
 
 | Patch | Description |
 |---|---|
-| TTS reliability | Re-creates the TTS engine when it dies, pauses during calls and resumes afterwards, retries failed lines, uses the correct Vietnamese voice. |
+| TTS reliability | Re-creates the TTS engine when it dies, pauses during calls and resumes afterwards, retries failed lines, uses the correct Vietnamese voice, applies a new speed right away instead of after pause + play. |
 | Background reading | Keeps reading (and moving to the next chapter) with the screen off. |
 | Fix Google login | "Đăng nhập với Google" failed with error 400: the server now expects the Firebase ID token (like the website) instead of the email this app version sends. |
+| Show chapter titles | Shows the real chapter titles instead of "Vô Đề Mục" in the chapter list, the reader and the TTS, taken from the first line of each chapter's public preview and cached on the device. |
 | Auto sync reading history | Records free chapters 1–50 on the server (it only saw chapter 51+) and merges the progress from your other devices, with book titles, when the app starts, without pressing "Đồng bộ". |
 
 <!-- PATCHES_END -->
@@ -37,15 +39,17 @@ extensions/
       tts/TtsController.java           TTS engine lifecycle, call handling, background session
       sync/AutoSyncPatch.java          automatic reading history sync
       login/FixGoogleLoginPatch.java   OkHttp interceptor fixing the Google login request
+      titles/ChapterTitlesPatch.java   real chapter titles (+ ChapterListInterceptor)
     stub/                              compile-only signatures of app classes (not bundled)
 patches/src/main/kotlin/app/hoitruyenchu/
   patches/itruyenchu/
-    shared/Constants.kt                compatibility + extension class names
+    shared/                            Constants.kt (compatibility, extension classes) + shared Fingerprints.kt (OkHttp, AsyncStorage)
     misc/extension/SharedExtensionPatch.kt
     audio/tts/                         TtsReliabilityPatch.kt + Fingerprints.kt
     audio/backgroundreading/           BackgroundReadingPatch.kt + Fingerprints.kt
-    misc/sync/                         AutoSyncReadingHistoryPatch.kt + Fingerprints.kt
-    misc/login/                        FixGoogleLoginPatch.kt + Fingerprints.kt
+    misc/sync/                         AutoSyncReadingHistoryPatch.kt
+    misc/titles/                       ShowChapterTitlesPatch.kt
+    misc/login/                        FixGoogleLoginPatch.kt
   util/PatchListGenerator.kt
 ```
 
@@ -69,6 +73,15 @@ native modules it uses (expo-speech, React Native timers, AsyncStorage) instead 
   so the server records it; on app start pulls the recorded progress and merges it into the stored history before
   the app loads it (waits at most 4.5 s, offline-safe). Entries that only have a slug and a chapter get their title
   and chapter count from the public `books/{slug}.json`, like the reader does.
+- **"Vô Đề Mục"**: the chapter list (`/chapters/{slug}.json.gz` = `{"207": {"title": "Chương 207"}}`) has no real
+  title for many books, so the app (and the website) strip "Chương 207" and show "Vô Đề Mục". The real title is the
+  first `Chương N: ...` line of the chapter text, and the public preview (`/preview/{slug}/chuong-{n}-preview.txt`,
+  gzip; `/free/...` for chapters 1–50) starts with it. The patch reads the first kilobyte of each (HTTP Range,
+  no login, nothing recorded), caches the titles in `files/htc-chapter-titles/`, and fills them into the downloaded
+  list and into the copy the app keeps in AsyncStorage (`s3:{url}`, refreshed hourly). Some chapters really have no title.
+- **TTS speed**: the voice bar's reading chain (`speakLine` -> `onDone` -> `speakLine`) keeps the speed of the render
+  in which play was pressed. The voice bar store is saved in AsyncStorage as `tts_voice_state`
+  (`{"state":{"spead":..}}`, sic), so the patch takes the speed from there and speaks the current line again at it.
 
 ## 🛠️ Building locally
 
@@ -77,7 +90,7 @@ native modules it uses (expo-speech, React Native timers, AsyncStorage) instead 
 - The built patches file is `patches/build/libs/patches-*.mpp`.
 - Patch the APK with [Morphe Desktop](https://github.com/MorpheApp/morphe-desktop) or Morphe Manager.
 
-Logs: `adb logcat -s HTC-TtsFix HTC-Sync HTC-Login`
+Logs: `adb logcat -s HTC-TtsFix HTC-Sync HTC-Login HTC-Titles`
 
 ## 📜 License
 
