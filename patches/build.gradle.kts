@@ -3,11 +3,11 @@ group = "app.hoitruyenchu"
 patches {
     about {
         name = "HoiTruyenChu Patches"
-        description = "Fix nghe truyện (TTS) chạy nền, sau cuộc gọi, và nút play bị đứng cho app iTruyenChu"
-        source = "local"
+        description = "Fix nghe truyện (TTS) chạy nền, sau cuộc gọi, nút play bị đứng và tự động đồng bộ lịch sử đọc cho app iTruyenChu"
+        source = "git@github.com:CozyCode890/HoiTruyenChu-patches.git"
         author = "HoiTruyenChu"
         contact = "na"
-        website = "na"
+        website = "https://github.com/CozyCode890/HoiTruyenChu-patches"
         license = "GPLv3"
     }
 }
@@ -28,7 +28,7 @@ tasks {
         dependsOn(build)
 
         classpath = sourceSets["main"].runtimeClasspath + patchListGeneratorClasspath
-        mainClass.set("util.PatchListGeneratorKt")
+        mainClass.set("app.hoitruyenchu.util.PatchListGeneratorKt")
     }
 
     publish {
