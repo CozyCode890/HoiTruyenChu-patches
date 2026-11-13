@@ -14,6 +14,10 @@ public final class Request {
         throw new UnsupportedOperationException("Stub");
     }
 
+    public String header(String name) {
+        throw new UnsupportedOperationException("Stub");
+    }
+
     public Builder newBuilder() {
         throw new UnsupportedOperationException("Stub");
     }

@@ -88,6 +88,8 @@ public final class AutoSyncPatch {
     private static final long STARTUP_WAIT_MS = 4_500;
     private static final int STARTUP_TIMEOUT_MS = 3_000;
     private static final int TIMEOUT_MS = 15_000;
+    /** How long the sync button may wait for the books recorded on the server. */
+    private static final long PUSH_BUDGET_MS = 8_000;
 
     private static final Object lock = new Object();
     private static Context appContext;
@@ -191,6 +193,73 @@ public final class AutoSyncPatch {
         }
     }
 
+    /**
+     * The "Đồng bộ" button (POST /users/sync-books, now HTTP 500), answered from sync-books-new:
+     * books this device has read further than the server knows are recorded on the server, then the
+     * two histories are merged.
+     *
+     * @param local  the history posted by the button
+     * @param pulled answer of POST /users/sync-books-new
+     * @return {"recentReads": [...], "message": ".."} for the button: it clears the history and adds
+     *         the entries one by one, each in front, so the list is sent oldest first.
+     */
+    static String onSyncButton(JSONArray local, String pulled, String authorization) throws Exception {
+        if (token == null && authorization != null && authorization.startsWith("Bearer ")) {
+            token = authorization.substring("Bearer ".length()).trim();
+        }
+        JSONObject response = pulled == null || pulled.trim().isEmpty() ? new JSONObject() : new JSONObject(pulled);
+        JSONArray remote = itemsFrom(response.opt("recentReads"));
+        if (remote == null) remote = new JSONArray();
+
+        int pushed = pushNewer(local, remote);
+        JSONArray merged = merge(new JSONArray(local.toString()), remote);
+        fillBookInfo(merged);
+
+        JSONArray oldestFirst = new JSONArray();
+        for (int i = merged.length() - 1; i >= 0; i--) oldestFirst.put(merged.get(i));
+        int added = merged.length() - local.length();
+        String message = "Đồng bộ truyện thành công";
+        if (added > 0) message += " (+" + added + " truyện)";
+        Log.i(TAG, "sync button: local=" + local.length() + " server=" + remote.length()
+                + " pushed=" + pushed + " merged=" + merged.length());
+        return new JSONObject().put("recentReads", oldestFirst).put("message", message).toString();
+    }
+
+    /** Records on the server the books read further on this device. @return number recorded. */
+    private static int pushNewer(JSONArray local, JSONArray remote) {
+        java.util.Map<String, Double> server = new java.util.HashMap<>();
+        for (int i = 0; i < remote.length(); i++) {
+            JSONObject item = remote.optJSONObject(i);
+            if (item != null) server.put(item.optString("slug"), chapterOf(item));
+        }
+        List<Callable<Boolean>> tasks = new ArrayList<>();
+        for (int i = 0; i < local.length(); i++) {
+            JSONObject item = local.optJSONObject(i);
+            if (item == null) continue;
+            final String slug = item.optString("slug", "");
+            final double chapter = chapterOf(item);
+            Double known = server.get(slug);
+            if (slug.isEmpty() || chapter < 1 || chapter != Math.rint(chapter)) continue;
+            if (known != null && known >= chapter) continue;
+            tasks.add(() -> recordChapter(slug, (int) chapter));
+        }
+        if (tasks.isEmpty() || token == null) return 0;
+        ExecutorService pool = Executors.newFixedThreadPool(Math.min(4, tasks.size()));
+        int count = 0;
+        try {
+            for (Future<Boolean> result : pool.invokeAll(tasks, PUSH_BUDGET_MS, TimeUnit.MILLISECONDS)) {
+                try {
+                    if (Boolean.TRUE.equals(result.get())) count++;
+                } catch (Throwable ignored) {
+                }
+            }
+        } catch (InterruptedException ignored) {
+        } finally {
+            pool.shutdownNow();
+        }
+        return count;
+    }
+
     // ---------------------------------------------------------------------------------------------
     // Sync
 
@@ -204,18 +273,20 @@ public final class AutoSyncPatch {
     }
 
     /** Downloads the chapter with the token, the way the app does for chapter 51+, so the server records it. */
-    private static void recordChapter(String slug, int chapter) {
+    private static boolean recordChapter(String slug, int chapter) {
         String currentToken = token;
-        if (currentToken == null) return;
+        if (currentToken == null) return false;
         String url = API_URL + "/chapters/" + Uri.encode(slug) + "/content/" + chapter;
         int code = request("GET", url, null, currentToken, TIMEOUT_MS, null);
         if (code >= 200 && code < 300) {
             Log.i(TAG, "recorded chapter " + chapter + " of " + slug);
+            return true;
         } else {
             Log.w(TAG, "recording chapter " + chapter + " of " + slug + " -> HTTP " + code);
             synchronized (lock) {
                 if ((slug + "/" + chapter).equals(lastRecorded)) lastRecorded = null; // retry next time
             }
+            return false;
         }
     }
 
