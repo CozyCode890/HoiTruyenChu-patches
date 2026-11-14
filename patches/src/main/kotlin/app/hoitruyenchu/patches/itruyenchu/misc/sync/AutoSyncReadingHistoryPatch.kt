@@ -3,12 +3,14 @@ package app.hoitruyenchu.patches.itruyenchu.misc.sync
 import app.hoitruyenchu.patches.itruyenchu.misc.extension.sharedExtensionPatch
 import app.hoitruyenchu.patches.itruyenchu.shared.Constants.COMPATIBILITY_ITRUYENCHU
 import app.hoitruyenchu.patches.itruyenchu.shared.Constants.EXTENSION_AUTO_SYNC
+import app.hoitruyenchu.patches.itruyenchu.shared.Constants.EXTENSION_SYNC_SCRIPT
 import app.hoitruyenchu.patches.itruyenchu.shared.ASYNC_STORAGE_MODULE
 import app.hoitruyenchu.patches.itruyenchu.shared.AsyncStorageConstructorFingerprint
 import app.hoitruyenchu.patches.itruyenchu.shared.AsyncStorageMultiGetFingerprint
 import app.hoitruyenchu.patches.itruyenchu.shared.AsyncStorageMultiSetFingerprint
 import app.hoitruyenchu.patches.itruyenchu.shared.CreateClientBuilderFingerprint
 import app.hoitruyenchu.patches.itruyenchu.shared.OKHTTP_CLIENT_BUILDER
+import app.hoitruyenchu.patches.itruyenchu.shared.ReactInstanceLoadJSBundleFingerprint
 import app.hoitruyenchu.patches.itruyenchu.shared.READABLE_ARRAY
 import app.morphe.patcher.extensions.InstructionExtensions.addInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
@@ -23,7 +25,8 @@ val autoSyncReadingHistoryPatch = patch(
     name = "Auto sync reading history",
     description = "Syncs the reading history with the iTruyenChu account without pressing the sync button: " +
             "free chapters 1-50, which the server never sees, are recorded too, and the progress " +
-            "from other devices is merged in (with book titles) when the app starts.",
+            "from other devices is merged in (with book titles) when the app starts and right after logging in. " +
+            "The \"Đồng bộ\" button also works when the bookshelf is empty.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_ITRUYENCHU)
@@ -73,6 +76,19 @@ val autoSyncReadingHistoryPatch = patch(
                     addInstruction(
                         index,
                         "invoke-static { v$register }, $EXTENSION_AUTO_SYNC->onCreateClientBuilder($OKHTTP_CLIENT_BUILDER)V",
+                    )
+                }
+        }
+
+        // 5. JS script: sync right after logging in, and let the bookshelf button sync an empty bookshelf.
+        ReactInstanceLoadJSBundleFingerprint.method.apply {
+            val instructions = implementation!!.instructions.toList()
+            instructions.indices.reversed()
+                .filter { instructions[it].opcode == Opcode.RETURN_VOID }
+                .forEach { index ->
+                    addInstruction(
+                        index,
+                        "invoke-static { p0 }, $EXTENSION_SYNC_SCRIPT->afterMainBundle(Ljava/lang/Object;)V",
                     )
                 }
         }

@@ -9,6 +9,7 @@ internal object Constants {
 
     const val EXTENSION_TTS_CONTROLLER = "$EXTENSION_PATCHES/tts/TtsController;"
     const val EXTENSION_AUTO_SYNC = "$EXTENSION_PATCHES/sync/AutoSyncPatch;"
+    const val EXTENSION_SYNC_SCRIPT = "$EXTENSION_PATCHES/sync/SyncScript;"
     const val EXTENSION_CHAPTER_TITLES = "$EXTENSION_PATCHES/titles/ChapterTitlesPatch;"
     const val EXTENSION_FIX_GOOGLE_LOGIN = "$EXTENSION_PATCHES/login/FixGoogleLoginPatch;"
     const val EXTENSION_TTS_MEDIA_SESSION = "$EXTENSION_PATCHES/media/TtsMediaSession;"

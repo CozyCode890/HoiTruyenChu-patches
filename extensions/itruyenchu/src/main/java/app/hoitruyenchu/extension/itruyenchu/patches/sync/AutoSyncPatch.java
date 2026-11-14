@@ -530,10 +530,13 @@ public final class AutoSyncPatch {
         if (value instanceof JSONArray) return (JSONArray) value;
         if (!(value instanceof JSONObject)) return null;
         JSONObject map = (JSONObject) value;
-        JSONArray items = new JSONArray();
+        // The map is oldest first: the app's own handler (F29056) adds the entries one by one with
+        // addRecentRead, which puts each on top, so the last key ends up as the most recent book.
+        List<String> slugs = new ArrayList<>();
         Iterator<String> keys = map.keys();
-        while (keys.hasNext()) {
-            String slug = keys.next();
+        while (keys.hasNext()) slugs.add(0, keys.next());
+        JSONArray items = new JSONArray();
+        for (String slug : slugs) {
             Object chapter = map.get(slug);
             items.put(new JSONObject()
                     .put("slug", slug)
