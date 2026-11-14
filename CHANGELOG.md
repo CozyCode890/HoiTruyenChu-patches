@@ -1,3 +1,9 @@
+## [1.1.2](https://github.com/CozyCode890/HoiTruyenChu-patches/compare/v1.1.1...v1.1.2) (2026-11-14)
+
+### 🐛 Bug Fixes
+
+* sync the reading history right after logging in ([22ff088](https://github.com/CozyCode890/HoiTruyenChu-patches/commit/22ff088756131405416ffcc6960d4105a98256c3))
+
 ## [1.1.1](https://github.com/CozyCode890/HoiTruyenChu-patches/compare/v1.1.0...v1.1.1) (2026-11-13)
 
 ### 🐛 Bug Fixes
