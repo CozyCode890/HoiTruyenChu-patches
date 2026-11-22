@@ -97,6 +97,8 @@ final class VoiceBarScript {
             + "        depth++;\n"
             + "        try { return orig.apply(this, arguments); } finally { depth--; }\n"
             + "      };\n"
+            + "      // Keep the marks of other scripts wrapping the voice bar too (tap to seek), so nobody wraps twice.\n"
+            + "      for (var k in orig) { if (k.indexOf('__htc') === 0) VoiceBar[k] = orig[k]; }\n"
             + "      VoiceBar.__htc = true;\n"
             + "      memo.type = VoiceBar;\n"
             + "      try { icons = g.__r(883); } catch (e) { icons = null; }\n"
