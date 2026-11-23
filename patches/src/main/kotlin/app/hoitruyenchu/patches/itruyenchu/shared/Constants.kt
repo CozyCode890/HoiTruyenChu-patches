@@ -26,7 +26,8 @@ internal object Constants {
         apkFileType = ApkFileType.APK,
         appIconColor = 0xFFFFFF,
         targets = listOf(
-            // Version the patches were developed and tested against.
+            // Versions the patches were developed and tested against.
+            AppTarget(version = "3.0.0"),
             AppTarget(version = "2.1.0"),
             // The hooks target expo-speech / React Native / AsyncStorage internals, not app code,
             // so newer app versions very likely work as well.

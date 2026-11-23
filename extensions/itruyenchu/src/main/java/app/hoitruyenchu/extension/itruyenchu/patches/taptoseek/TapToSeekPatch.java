@@ -5,25 +5,30 @@ import app.hoitruyenchu.extension.itruyenchu.patches.shared.JsScripts;
 /**
  * Tapping a line of the chapter moves the voice reading there (vertical reading mode).
  * <ul>
- *   <li>Reading: the reading continues from the tapped line (the voice bar's play button is pressed to
- *       stop, and pressed again from that line once the bar shows "play").</li>
+ *   <li>Reading, another line tapped (setting {@code tap.otherLine}): "jump" (default) the reading
+ *       continues from the tapped line (the voice bar's play button is pressed to stop, and pressed again
+ *       from that line once the bar shows "play"); "mark" the reading stops and the tapped line is
+ *       highlighted, play starts from it; "nothing".</li>
+ *   <li>Reading, the line being read tapped (setting {@code tap.currentLine}): "nothing" (default);
+ *       "pause" the reading stops, and tapping the highlighted line again plays from it; "restart" the
+ *       line is read again from its start.</li>
  *   <li>Voice bar open but stopped: only the highlight moves, play starts from that line.</li>
  *   <li>Voice bar closed: the bar opens and the line is highlighted, nothing is spoken.</li>
- *   <li>Tapping the line being read does nothing.</li>
  *   <li>Scrolling by hand while the voice bar is open stops the automatic scroll to the line being read
  *       and shows a "Về dòng đang đọc" button; the button or a tapped line makes the reader follow
  *       the voice again.</li>
- *   <li>The reader shows the text after the "Thay thế" rules but the voice bar reads the original text.
- *       When a rule removes a whole line the line numbers differ: lines are matched by content
- *       (tapped line, highlight and automatic scroll).</li>
+ *   <li>App 2.1.0: the reader shows the text after the "Thay thế" rules but the voice bar reads the
+ *       original text. When a rule removes a whole line the line numbers differ: lines are matched by
+ *       content (tapped line, highlight and automatic scroll). App 3.0.0 reads the replaced text, the
+ *       numbers always match.</li>
  * </ul>
  * A JS script ({@link #SCRIPT}) is evaluated right after the app's bundle. It wraps react/jsx-runtime:
- * the line {@code <Text>} elements rendered by ReadContent get an onPress, the reader's ScrollView gets
+ * the line {@code <Text>} elements get onPress / onLongPress (2.1.0: rendered by ReadContent with the line
+ * number as key; 3.0.0: one per memo(Line) component, line number in its props), the reader's ScrollView gets
  * onScrollBeginDrag and is wrapped in a View holding the button, the voice bar's play button is
- * recognized by its lucide icon. Module ids of app 2.1.0: 288 react/jsx-runtime, 114 react,
- * 74 react-native, 883 lucide-react-native, 2766 useTTSVoiceStore, 2765 useMagicReplaceStore +
- * applyReplaceRules. Plain ES5, everything inside try/catch: an exception escaping here would be a
- * fatal JS error.
+ * recognized by its lucide icon. App modules (jsx, react, rn, icons, voice, replace =
+ * useMagicReplaceStore + applyReplaceRules) come from {@code __htcR(name)}, ids per app version in
+ * AppInfo. Plain ES5, everything inside try/catch: an exception escaping here would be a fatal JS error.
  */
 @SuppressWarnings("unused")
 public final class TapToSeekPatch {
@@ -46,10 +51,10 @@ public final class TapToSeekPatch {
             + "  try {\n"
             + "    var g = typeof globalThis !== 'undefined' ? globalThis : this;\n"
             + "    if (typeof g.__r !== 'function') { log('no __r'); return; }\n"
-            + "    var JSX = g.__r(288);\n"
-            + "    var React = g.__r(114);\n"
-            + "    var RN = g.__r(74);\n"
-            + "    var VM = g.__r(2766);\n"
+            + "    var JSX = g.__htcR('jsx');\n"
+            + "    var React = g.__htcR('react');\n"
+            + "    var RN = g.__htcR('rn');\n"
+            + "    var VM = g.__htcR('voice');\n"
             + "    var V = VM && VM.useTTSVoiceStore;\n"
             + "    if (!JSX || typeof JSX.jsx !== 'function' || typeof JSX.jsxs !== 'function'\n"
             + "        || !React || typeof React.useState !== 'function' || typeof React.useEffect !== 'function'\n"
@@ -83,6 +88,9 @@ public final class TapToSeekPatch {
             + "    var restarting = 0;       // time play was pressed again after a tap, until the bar shows \"pause\"\n"
             + "    var queued = null;        // line tapped while restarting, done once the reading runs\n"
             + "    var contentDepth = 0;     // > 0 while ReadContent renders\n"
+            + "    var lineIndex = -1;       // line number while a Line component (app 3.0.0) renders\n"
+            + "    // App 3.0.0's voice bar reads the text after the \"Thay the\" rules, like the reader shows it.\n"
+            + "    var voiceReplaced = !!(g.__htcApp && g.__htcApp.voiceReplaced);\n"
             + "    var readContent = null;   // our wrapper of ReadContent\n"
             + "    var rawText = null;       // chapter text given to the reader (read by the voice bar)\n"
             + "    var shownText = null;     // text shown by ReadContent (with the \"Thay the\" rules applied)\n"
@@ -126,7 +134,7 @@ public final class TapToSeekPatch {
             + "      var shown = splitLines(shownText);\n"
             + "      if (raw.length === shown.length) return;\n"
             + "      try {\n"
-            + "        var M = g.__r(2765);\n"
+            + "        var M = g.__htcR('replace');\n"
             + "        var rules = M.useMagicReplaceStore.getState().rules;\n"
             + "        var keep = [];\n"
             + "        for (var j = 0; j < raw.length; j++) {\n"
@@ -230,7 +238,17 @@ public final class TapToSeekPatch {
             + "    }\n"
             + "\n"
             + "    // Gesture of the settings: \"tap\", \"double\" (two taps within 350 ms) or \"long\" (onLongPress).\n"
+            + "    // Lines get both handlers and the setting is read when pressed (app 3.0.0's lines are memo\n"
+            + "    // components that do not render again when a setting changes).\n"
             + "    var lastTap = { i: -1, t: 0 };\n"
+            + "    function onLineShortPress(index) {\n"
+            + "      if (S('tap.gesture', 'tap') === 'long') return;\n"
+            + "      onLinePress(index);\n"
+            + "    }\n"
+            + "    function onLineLongPress(index) {\n"
+            + "      if (S('tap.gesture', 'tap') !== 'long') { onLinePress(index); return; }\n"
+            + "      if (S('tap.enabled', true)) onLineTap(index);\n"
+            + "    }\n"
             + "    function onLinePress(index) {\n"
             + "      if (!S('tap.enabled', true)) return;\n"
             + "      if (S('tap.gesture', 'tap') !== 'double') { onLineTap(index); return; }\n"
@@ -269,24 +287,58 @@ public final class TapToSeekPatch {
             + "          if (mode === 'play') playOnceOpen(target);\n"
             + "          return;\n"
             + "        }\n"
+            + "        var current = target === s.activeLine;\n"
+            + "        // Settings, while reading: the line being read tapped \"nothing\" / \"pause\" / \"restart\";\n"
+            + "        // another line \"jump\" / \"mark\" (stop, highlight it) / \"nothing\".\n"
+            + "        var how = current ? S('tap.currentLine', 'nothing') : S('tap.otherLine', 'jump');\n"
             + "        if (pending) {\n"
-            + "          // Still restarting after the previous tap: the last tapped line wins.\n"
+            + "          // Stopped by the previous tap, about to read again from pending.target (= activeLine).\n"
+            + "          if (how === 'nothing') { log('line ' + target + ' ignored while restarting'); return; }\n"
+            + "          if (how === 'pause' || how === 'mark') {\n"
+            + "            pending = null;\n"
+            + "            setDetached(false);\n"
+            + "            if (!current) s.setActiveLine(target);\n"
+            + "            log('restart cancelled, line ' + target + ' marked');\n"
+            + "            return;\n"
+            + "          }\n"
+            + "          // The last tapped line wins.\n"
             + "          pending.target = target;\n"
             + "          setDetached(false);\n"
             + "          if (s.activeLine !== target) s.setActiveLine(target);\n"
             + "          return;\n"
             + "        }\n"
             + "        if (restarting && !bar.playing && Date.now() - restarting < 3000) {\n"
-            + "          // Play was just pressed again (the voices are being checked): jump once the reading runs.\n"
+            + "          // Play was just pressed again (the voices are being checked): handled once the reading runs.\n"
             + "          queued = target;\n"
             + "          setDetached(false);\n"
             + "          return;\n"
             + "        }\n"
-            + "        if (target === s.activeLine) { log('line ' + target + ' is the current line'); return; }\n"
+            + "        var reading = barMounted > 0 && bar.playing && typeof bar.play === 'function';\n"
+            + "        if (!reading && current) {\n"
+            + "          // Stopped, the highlighted line tapped: with \"pause\" it is read again from its start.\n"
+            + "          if (S('tap.currentLine', 'nothing') === 'pause' && barMounted > 0 && typeof bar.play === 'function') {\n"
+            + "            log('reading again from line ' + target);\n"
+            + "            setDetached(false);\n"
+            + "            restarting = Date.now();\n"
+            + "            bar.play();\n"
+            + "          } else {\n"
+            + "            log('line ' + target + ' is the current line');\n"
+            + "          }\n"
+            + "          return;\n"
+            + "        }\n"
+            + "        if (reading && how === 'nothing') { log('line ' + target + ' ignored while reading'); return; }\n"
             + "        setDetached(false);\n"
-            + "        if (barMounted > 0 && bar.playing && typeof bar.play === 'function') {\n"
-            + "          // Reading: stop (play button), then start again from the line once the bar shows \"play\".\n"
-            + "          log('jump to line ' + target);\n"
+            + "        if (reading && (how === 'pause' || how === 'mark')) {\n"
+            + "          // Stop (play button); the highlight stays on / moves to the tapped line, play reads from it.\n"
+            + "          log(how === 'pause' ? 'paused at line ' + target : 'stopped, line ' + target + ' marked');\n"
+            + "          if (!current) s.setActiveLine(target);\n"
+            + "          bar.play();\n"
+            + "          return;\n"
+            + "        }\n"
+            + "        if (reading) {\n"
+            + "          // \"jump\" or \"restart\": stop (play button), then start again from the line once\n"
+            + "          // the bar shows \"play\".\n"
+            + "          log((current ? 'reading again line ' : 'jump to line ') + target);\n"
             + "          var p = { target: target, started: false };\n"
             + "          pending = p;\n"
             + "          s.setActiveLine(target);\n"
@@ -372,6 +424,21 @@ public final class TapToSeekPatch {
             + "      return ReadContent;\n"
             + "    }\n"
             + "\n"
+            + "    // App 3.0.0: memo(Line) renders one line of ReadContent, {index, text, textStyle, activeStyle,\n"
+            + "    // onLineLayout} -> <Text onLayout style>. The wrapper tells that Text which line it is.\n"
+            + "    function wrapLine(memo) {\n"
+            + "      var orig = memo.type;\n"
+            + "      var Line = function (props) {\n"
+            + "        var saved = lineIndex;\n"
+            + "        lineIndex = props && typeof props.index === 'number' ? props.index : -1;\n"
+            + "        try { return orig.apply(this, arguments); } finally { lineIndex = saved; }\n"
+            + "      };\n"
+            + "      for (var k in orig) { if (k.indexOf('__htc') === 0) Line[k] = orig[k]; }\n"
+            + "      Line.__htcTap = true;\n"
+            + "      memo.type = Line;\n"
+            + "      log('reader lines hooked');\n"
+            + "    }\n"
+            + "\n"
             + "    function wrapVoiceBar(memo) {\n"
             + "      var orig = memo.type;\n"
             + "      var VoiceBar = function (props) {\n"
@@ -388,15 +455,16 @@ public final class TapToSeekPatch {
             + "      for (var k in orig) { if (k.indexOf('__htc') === 0) VoiceBar[k] = orig[k]; }\n"
             + "      VoiceBar.__htcTap = true;\n"
             + "      memo.type = VoiceBar;\n"
-            + "      try { icons = g.__r(883); } catch (e) { icons = null; }\n"
+            + "      try { icons = g.__htcR('icons'); } catch (e) { icons = null; }\n"
             + "      log('voice bar hooked' + (icons ? '' : ' (no icons)'));\n"
             + "    }\n"
             + "\n"
-            + "    // One line of ReadContent: <Text key={index} onLayout? style={[line, active && highlight]}>.\n"
+            + "    // One line: <Text key={index} onLayout? style={[line, active && highlight]}> rendered by ReadContent\n"
+            + "    // (2.1.0), or the Text of a Line component (3.0.0).\n"
             + "    function lineProps(props, index) {\n"
             + "      var extra = {};\n"
-            + "      if (S('tap.gesture', 'tap') === 'long') extra.onLongPress = function () { if (S('tap.enabled', true)) onLineTap(index); };\n"
-            + "      else extra.onPress = function () { onLinePress(index); };\n"
+            + "      extra.onPress = function () { onLineShortPress(index); };\n"
+            + "      extra.onLongPress = function () { onLineLongPress(index); };\n"
             + "      var onLayout = props.onLayout;\n"
             + "      if (typeof onLayout === 'function') {\n"
             + "        extra.onLayout = function (e) {\n"
@@ -462,7 +530,7 @@ public final class TapToSeekPatch {
             + "      }\n"
             + "      if (typeof type === 'function') {\n"
             + "        if (type.name === 'ReadEngine') {\n"
-            + "          if (props && typeof props.content === 'string') rawText = props.content;\n"
+            + "          if (!voiceReplaced && props && typeof props.content === 'string') rawText = props.content;\n"
             + "          return null;\n"
             + "        }\n"
             + "        if (type.name === 'ReadContent' && !type.__htcTap) {\n"
@@ -470,10 +538,16 @@ public final class TapToSeekPatch {
             + "          return { type: readContent, props: props };\n"
             + "        }\n"
             + "      }\n"
+            + "      if (contentDepth > 0 && typeof type === 'object' && typeof type.type === 'function'\n"
+            + "          && type.type.name === 'Line' && !type.type.__htcTap) {\n"
+            + "        wrapLine(type);\n"
+            + "        return null;\n"
+            + "      }\n"
             + "      if (!props || typeof props !== 'object') return null;\n"
             + "      if ((type === Text || type === ScrollView) && !S('tap.enabled', true)) return null;\n"
             + "      if (type === Text) {\n"
             + "        if (contentDepth > 0 && typeof key === 'number') return { type: type, props: lineProps(props, key) };\n"
+            + "        if (lineIndex >= 0) return { type: type, props: lineProps(props, lineIndex) };\n"
             + "        return null;\n"
             + "      }\n"
             + "      if (type === ScrollView) {\n"

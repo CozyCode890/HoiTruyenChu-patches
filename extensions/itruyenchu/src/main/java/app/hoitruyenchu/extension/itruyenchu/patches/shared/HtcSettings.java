@@ -64,6 +64,10 @@ public final class HtcSettings {
     public static final String TAP_RETURN_BUTTON = "tap.returnButton";
     public static final String TAP_AUTO_RETURN = "tap.autoReturn";
     public static final String TAP_CLOSED_BAR = "tap.closedBar";
+    /** Tapping the line being read while reading: "nothing", "pause" or "restart". */
+    public static final String TAP_CURRENT_LINE = "tap.currentLine";
+    /** Tapping another line while reading: "jump", "mark" or "nothing". */
+    public static final String TAP_OTHER_LINE = "tap.otherLine";
     // Show chapter titles
     public static final String TITLES_ENABLED = "titles.enabled";
     public static final String TITLES_WIFI_ONLY = "titles.wifiOnly";
@@ -103,6 +107,8 @@ public final class HtcSettings {
         DEFAULTS.put(TAP_RETURN_BUTTON, true);
         DEFAULTS.put(TAP_AUTO_RETURN, 0);
         DEFAULTS.put(TAP_CLOSED_BAR, "mark");
+        DEFAULTS.put(TAP_CURRENT_LINE, "nothing");
+        DEFAULTS.put(TAP_OTHER_LINE, "jump");
         DEFAULTS.put(TITLES_ENABLED, true);
         DEFAULTS.put(TITLES_WIFI_ONLY, false);
         DEFAULTS.put(TITLES_SKIP_HEADER, false);

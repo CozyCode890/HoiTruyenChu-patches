@@ -249,6 +249,12 @@ public final class SettingsActivity extends Activity {
         choice(HtcSettings.TAP_AUTO_RETURN, "Tự quay về dòng đang đọc", on,
                 new Object[]{0, 5, 10, 30},
                 new String[]{"Tắt", "Sau 5 giây không chạm", "Sau 10 giây không chạm", "Sau 30 giây không chạm"});
+        choice(HtcSettings.TAP_CURRENT_LINE, "Chạm dòng đang đọc (khi đang phát)", on,
+                new Object[]{"nothing", "pause", "restart"},
+                new String[]{"Không làm gì", "Tạm dừng / đọc tiếp", "Đọc lại dòng từ đầu"});
+        choice(HtcSettings.TAP_OTHER_LINE, "Chạm dòng khác (khi đang phát)", on,
+                new Object[]{"jump", "mark", "nothing"},
+                new String[]{"Nhảy tới dòng đó và đọc tiếp", "Dừng đọc, chỉ đánh dấu dòng", "Không làm gì"});
         choice(HtcSettings.TAP_CLOSED_BAR, "Chạm khi thanh đọc đang đóng", on,
                 new Object[]{"mark", "nothing", "play"},
                 new String[]{"Mở thanh đọc, đánh dấu dòng", "Không làm gì", "Mở thanh đọc và đọc luôn"});

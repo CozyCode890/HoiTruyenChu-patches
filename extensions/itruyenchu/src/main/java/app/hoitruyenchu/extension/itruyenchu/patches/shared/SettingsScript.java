@@ -13,9 +13,8 @@ package app.hoitruyenchu.extension.itruyenchu.patches.shared;
  *   <li>Remember speed: the speed chosen in the settings screen ("speed" command).</li>
  * </ul>
  * Commands to Java are written to AsyncStorage {@code htc_cmd} ({@link HtcSettings#onStorageSet}).
- * Module ids of app 2.1.0: 288 react/jsx-runtime, 114 react, 74 react-native, 883 lucide-react-native,
- * 2766 useTTSVoiceStore. Plain ES5, everything inside try/catch: an exception escaping here would be a
- * fatal JS error.
+ * App modules (jsx, react, rn, icons, voice) come from {@code __htcR(name)}, ids per app version in
+ * AppInfo. Plain ES5, everything inside try/catch: an exception escaping here would be a fatal JS error.
  */
 final class SettingsScript {
     static final String FILE_NAME = "htc-settings.js";
@@ -31,10 +30,10 @@ final class SettingsScript {
             + "  try {\n"
             + "    var g = typeof globalThis !== 'undefined' ? globalThis : this;\n"
             + "    if (typeof g.__r !== 'function') { log('no __r'); return; }\n"
-            + "    var JSX = g.__r(288);\n"
-            + "    var React = g.__r(114);\n"
-            + "    var RN = g.__r(74);\n"
-            + "    var VM = g.__r(2766);\n"
+            + "    var JSX = g.__htcR('jsx');\n"
+            + "    var React = g.__htcR('react');\n"
+            + "    var RN = g.__htcR('rn');\n"
+            + "    var VM = g.__htcR('voice');\n"
             + "    var V = VM && VM.useTTSVoiceStore;\n"
             + "    if (!JSX || typeof JSX.jsx !== 'function' || typeof JSX.jsxs !== 'function'\n"
             + "        || !React || typeof React.useState !== 'function' || typeof React.useEffect !== 'function'\n"
@@ -45,7 +44,7 @@ final class SettingsScript {
             + "    var jsx0 = JSX.jsx, jsxs0 = JSX.jsxs;\n"
             + "    var View = RN.View, Text = RN.Text, Touch = RN.TouchableOpacity;\n"
             + "    var icons = null;\n"
-            + "    function loadIcons() { if (!icons) { try { icons = g.__r(883); } catch (e) { icons = null; } } return icons; }\n"
+            + "    function loadIcons() { if (!icons) { try { icons = g.__htcR('icons'); } catch (e) { icons = null; } } return icons; }\n"
             + "\n"
             + "    // ---- Java <-> JS\n"
             + "    function cmd(name, data) {\n"

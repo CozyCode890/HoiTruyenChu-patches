@@ -13,9 +13,13 @@ import app.hoitruyenchu.extension.itruyenchu.patches.shared.JsScripts;
  * <p>
  * A JS script ({@link #SCRIPT}) evaluated right after the app's bundle waits for the store to be
  * hydrated and calls {@code setSpeed(spead)}. The speed is one for all books, like the app intends,
- * and the value saved by the unpatched app before is used as well. Plain ES5, everything inside
- * try/catch: an exception escaping here would be a fatal JS error. Module id (app 2.1.0):
- * 2766 = useTTSVoiceStore.
+ * and the value saved by the unpatched app before is used as well.
+ * <p>
+ * App 3.0.0 fixed the typo (it saves and restores {@code speed} itself): there the script only moves a
+ * {@code spead} value saved by 2.1.0 over once, and keeps the extra levels of the speed picker. Plain ES5,
+ * everything inside
+ * try/catch: an exception escaping here would be a fatal JS error. App modules (voice, jsx, rn) come
+ * from {@code __htcR(name)}, ids per app version in AppInfo.
  */
 @SuppressWarnings("unused")
 public final class RememberSpeedPatch {
@@ -38,7 +42,7 @@ public final class RememberSpeedPatch {
             + "  try {\n"
             + "    var g = typeof globalThis !== 'undefined' ? globalThis : this;\n"
             + "    if (typeof g.__r !== 'function') { log('no __r'); return; }\n"
-            + "    var M = g.__r(2766);\n"
+            + "    var M = g.__htcR('voice');\n"
             + "    var V = M && M.useTTSVoiceStore;\n"
             + "    if (!V || typeof V.getState !== 'function' || typeof V.getState().setSpeed !== 'function'\n"
             + "        || !V.persist) { log('voice store not found'); return; }\n"
@@ -50,7 +54,7 @@ public final class RememberSpeedPatch {
             + "      try {\n"
             + "        var s = V.getState();\n"
             + "        var saved = s.spead;\n"
-            + "        if (typeof saved !== 'number' || !(saved >= 0.25 && saved <= 4)) { log('no saved speed'); return; }\n"
+            + "        if (typeof saved !== 'number' || !(saved >= 0.25 && saved <= 4)) { log('no old saved speed, speed ' + s.speed); return; }\n"
             + "        if (saved === s.speed) { log('speed ' + saved); return; }\n"
             + "        s.setSpeed(saved);\n"
             + "        log('speed restored ' + saved);\n"
@@ -71,8 +75,8 @@ public final class RememberSpeedPatch {
             + "    // More levels in the speed picker of the voice bar (SpeedControl: a View with one\n"
             + "    // TouchableOpacity per speed, key = speed, child Text [speed.toFixed(2), 'x']).\n"
             + "    var EXTRA = [0.9, 1.1, 1.75, 2.5, 3];\n"
-            + "    var JSX = g.__r(288);\n"
-            + "    var RN = g.__r(74);\n"
+            + "    var JSX = g.__htcR('jsx');\n"
+            + "    var RN = g.__htcR('rn');\n"
             + "    if (!JSX || typeof JSX.jsx !== 'function' || typeof JSX.jsxs !== 'function' || !RN || !RN.View) {\n"
             + "      log('jsx not found, no extra speeds'); return;\n"
             + "    }\n"
