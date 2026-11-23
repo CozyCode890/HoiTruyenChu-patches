@@ -23,7 +23,7 @@ Click the button below, or manually add this repo url to Morphe Manager: https:/
 ## 🩹 Patches list
 
 <!-- PATCHES_START EXPANDED -->
-> **[v2.0.0](https://github.com/CozyCode890/HoiTruyenChu-patches/releases/tag/v2.0.0)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;9 patches total
+> **[v2.1.0](https://github.com/CozyCode890/HoiTruyenChu-patches/releases/tag/v2.1.0)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;9 patches total
 <details open>
 <summary>📦 iTruyenChu&nbsp;&nbsp;•&nbsp;&nbsp;9 patches</summary>
 <br>
@@ -32,8 +32,8 @@ Click the button below, or manually add this repo url to Morphe Manager: https:/
 
 **🎯 Supported versions:**
 
-| 2.1.0 |
-| :---: |
+| 3.0.0 | 2.1.0 |
+| :---: | :---: |
 
 | 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
 |----------|----------------|-----------|
@@ -45,7 +45,7 @@ Click the button below, or manually add this repo url to Morphe Manager: https:/
 | [Show chapter titles](#show-chapter-titles) | Shows the real chapter titles instead of "Vô Đề Mục" in the chapter list, the reader and the TTS: books whose chapter list only has "Chương N" get the title from the first line of the chapter text (public preview, no login needed), cached on the device. |  |
 | [TTS media controls](#tts-media-controls) | The media widget / lock screen shows the TTS reading instead of the silent 6 s file of the voice bar: playing or paused, the position in the chapter (line x/y). Its play / pause and next / previous buttons work like the voice bar's buttons (next / previous chapter), and the previous chapter button of the voice bar, which did nothing, opens the previous chapter. |  |
 | [TTS reliability](#tts-reliability) | Fixes text-to-speech reading that stops after a phone call or does nothing when pressing play: re-creates the TTS engine when it dies, pauses during calls and resumes afterwards, retries failed lines, uses the correct Vietnamese voice, and applies a new speed right away instead of after pause + play. |  |
-| [Tap a line to listen from it](#tap-a-line-to-listen-from-it) | Tapping a line of the chapter (vertical reading) moves the voice reading there: while reading it continues from that line, while stopped the line is highlighted and play starts from it, with the voice bar closed the bar opens and the line is highlighted. Scrolling by hand while listening stops the automatic scrolling and shows a "Về dòng đang đọc" button. |  |
+| [Tap a line to listen from it](#tap-a-line-to-listen-from-it) | Tapping a line of the chapter (vertical reading) moves the voice reading there: while reading it continues from that line, while stopped the line is highlighted and play starts from it, with the voice bar closed the bar opens and the line is highlighted. What a tap does while reading can be set (tapped line being read: nothing / pause / read again; another line: jump / stop and mark / nothing). Scrolling by hand while listening stops the automatic scrolling and shows a "Về dòng đang đọc" button. |  |
 
 </details>
 
