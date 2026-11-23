@@ -1,3 +1,9 @@
+## [1.3.0](https://github.com/CozyCode890/HoiTruyenChu-patches/compare/v1.2.0...v1.3.0) (2026-11-23)
+
+### ✨ New Features
+
+* remember the listening speed ([2baaa8d](https://github.com/CozyCode890/HoiTruyenChu-patches/commit/2baaa8d72c6a323cc7a80a9b8b614b0d984e2254))
+
 ## [1.2.0](https://github.com/CozyCode890/HoiTruyenChu-patches/compare/v1.1.2...v1.2.0) (2026-11-22)
 
 ### ✨ New Features
