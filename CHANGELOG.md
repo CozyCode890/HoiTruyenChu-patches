@@ -1,3 +1,9 @@
+## [2.2.0](https://github.com/CozyCode890/HoiTruyenChu-patches/compare/v2.1.0...v2.2.0) (2026-11-23)
+
+### ✨ New Features
+
+* resume from the exact word, mini player, YouTube-like speed menu ([32de020](https://github.com/CozyCode890/HoiTruyenChu-patches/commit/32de020b9bc33d78dddeff51248af641cd9aed88))
+
 ## [2.1.0](https://github.com/CozyCode890/HoiTruyenChu-patches/compare/v2.0.0...v2.1.0) (2026-11-23)
 
 ### ✨ New Features
