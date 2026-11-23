@@ -1,5 +1,7 @@
 package app.hoitruyenchu.patches.itruyenchu.audio.speed
 
+import app.hoitruyenchu.patches.itruyenchu.misc.settings.enablePatchFlag
+import app.hoitruyenchu.patches.itruyenchu.misc.settings.settingsPatch
 import app.hoitruyenchu.patches.itruyenchu.misc.extension.sharedExtensionPatch
 import app.hoitruyenchu.patches.itruyenchu.shared.Constants.COMPATIBILITY_ITRUYENCHU
 import app.hoitruyenchu.patches.itruyenchu.shared.Constants.EXTENSION_REMEMBER_SPEED
@@ -17,9 +19,11 @@ val rememberSpeedPatch = patch(
 ) {
     compatibleWith(COMPATIBILITY_ITRUYENCHU)
 
-    dependsOn(sharedExtensionPatch)
+    dependsOn(sharedExtensionPatch, settingsPatch)
 
     execute {
+        enablePatchFlag("rememberSpeed")
+
         // JS script evaluated after the app bundle.
         ReactInstanceLoadJSBundleFingerprint.method.apply {
             val instructions = implementation!!.instructions.toList()
