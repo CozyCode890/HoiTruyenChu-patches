@@ -1,10 +1,16 @@
 # 🧩 HoiTruyenChu Patches
 
-Morphe patches for **iTruyenChu** (`com.ngoctieucac.itruyenchu`), tested on version 2.1.0.
+Morphe patches for **iTruyenChu** (`com.ngoctieucac.itruyenchu`), tested on versions 3.0.0 and 2.1.0.
 
 They fix text-to-speech reading (stops with the screen off, after a phone call, play button doing nothing,
 speed change ignored until pause + play), fix Google login, show the real chapter titles instead of "Vô Đề Mục",
 and make the reading history sync with your account automatically.
+
+### Ready-made APK
+
+Every [release](https://github.com/CozyCode890/HoiTruyenChu-patches/releases/latest) has the patched app attached
+(`itruyenchu-<app version>-patched-<release>.apk`), built by CI with Morphe Manager's default key, so it installs
+over an app patched with Morphe Manager.
 
 ### How to use these patches
 
@@ -108,6 +114,11 @@ native modules it uses (expo-speech, React Native timers, AsyncStorage) instead 
   [Morphe documentation](https://github.com/MorpheApp/morphe-documentation)).
 - The built patches file is `patches/build/libs/patches-*.mpp`.
 - Patch the APK with [Morphe Desktop](https://github.com/MorpheApp/morphe-desktop) or Morphe Manager.
+- CI (`.github/workflows/release.yml`, job "Patched APK", script `.github/scripts/build_apk.sh`) patches the
+  newest `app-<version>.apk` of the release [`app-source`](https://github.com/CozyCode890/HoiTruyenChu-patches/releases/tag/app-source)
+  with each new release and attaches the APK. When the app updates, upload the new original APK there. Needs the
+  secret `MORPHE_KEYSTORE_BASE64` (Morphe Manager's keystore, base64). To rebuild the APK of an existing release,
+  run the workflow with `apk_tag`.
 
 Logs: `adb logcat -s HTC-TtsFix HTC-Sync HTC-Login HTC-Titles`
 
