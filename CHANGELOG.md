@@ -1,3 +1,9 @@
+## [2.2.3](https://github.com/CozyCode890/HoiTruyenChu-patches/compare/v2.2.2...v2.2.3) (2026-11-28)
+
+### 🔧 Improvements
+
+* lighter patch code (leftovers of removed features and dead code dropped, duplicated helpers shared) ([3a5fc0b](https://github.com/CozyCode890/HoiTruyenChu-patches/commit/3a5fc0b25592726da614e6e4410c0acac8d897e8))
+
 ## [2.2.2](https://github.com/CozyCode890/HoiTruyenChu-patches/compare/v2.2.1...v2.2.2) (2026-11-28)
 
 ### 🐛 Bug Fixes
