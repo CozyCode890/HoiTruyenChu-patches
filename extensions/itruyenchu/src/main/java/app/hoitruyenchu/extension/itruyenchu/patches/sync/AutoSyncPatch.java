@@ -81,6 +81,8 @@ public final class AutoSyncPatch {
 
     private static final String KEY_READ = "read";
     private static final String KEY_AUTH = "auth-storage";
+    /** Books deleted from the history on this device, {slug: chapter when deleted} (written by SyncScript). */
+    private static final String KEY_DELETED = "htc_sync_deleted";
     private static final String DATABASE = "RKStorage";
     private static final String TABLE = "catalystLocalStorage";
 
@@ -216,6 +218,7 @@ public final class AutoSyncPatch {
         JSONObject response = pulled == null || pulled.trim().isEmpty() ? new JSONObject() : new JSONObject(pulled);
         JSONArray remote = itemsFrom(response.opt("recentReads"));
         if (remote == null) remote = new JSONArray();
+        remote = withoutDeleted(remote);
 
         int pushed = pushNewer(local, remote);
         JSONArray merged = merge(new JSONArray(local.toString()), remote);
@@ -315,6 +318,7 @@ public final class AutoSyncPatch {
             } else {
                 JSONObject response = post(PULL_PATH, null, STARTUP_TIMEOUT_MS);
                 if (response != null) remote = itemsFrom(response.opt("recentReads"));
+                if (remote != null) remote = withoutDeleted(remote);
             }
             int remoteCount = remote == null ? 0 : remote.length();
             // merge() and fillBookInfo() work on the local entry objects: compare with a snapshot.
@@ -335,6 +339,36 @@ public final class AutoSyncPatch {
         } finally {
             startupDone.countDown();
         }
+    }
+
+    /**
+     * The server keeps the progress of every book ever read and has no way to delete it: a book deleted
+     * from the history on this device came back with every sync. Server entries of a deleted book are
+     * dropped, unless the server knows a later chapter than the one at deletion (read further on
+     * another device since). Reading the book again on this device ends the deletion (SyncScript).
+     */
+    static JSONArray withoutDeleted(JSONArray remote) {
+        JSONObject deleted = null;
+        try {
+            String value = readDb(KEY_DELETED);
+            if (value != null && !value.trim().isEmpty()) deleted = new JSONObject(value);
+        } catch (Throwable t) {
+            Log.w(TAG, "could not read the deleted books", t);
+        }
+        if (deleted == null || deleted.length() == 0) return remote;
+        JSONArray kept = new JSONArray();
+        int dropped = 0;
+        for (int i = 0; i < remote.length(); i++) {
+            JSONObject item = remote.optJSONObject(i);
+            String slug = item == null ? null : item.optString("slug", null);
+            if (slug != null && deleted.has(slug) && chapterOf(item) <= deleted.optDouble(slug, Double.MAX_VALUE)) {
+                dropped++;
+                continue;
+            }
+            kept.put(item);
+        }
+        if (dropped > 0) Log.i(TAG, dropped + " book(s) deleted on this device not pulled back from the server");
+        return kept;
     }
 
     /**

@@ -179,6 +179,9 @@ public final class SettingsActivity extends Activity {
         choice(HtcSettings.TTS_RETRIES, "Đọc lại dòng bị lỗi", on,
                 new Object[]{0, 1, 2, 3, 4, 5},
                 new String[]{"Không đọc lại", "1 lần", "2 lần", "3 lần", "4 lần", "5 lần"});
+        choice(HtcSettings.TTS_ELLIPSIS_PAUSE, "Ngắt sau dấu \"...\"", on,
+                new Object[]{0, 300, 500, 1000},
+                new String[]{"Không ngắt", "Ngắn (0.3 giây)", "Vừa (0.5 giây)", "Dài (1 giây)"});
         action("Bộ đọc (TTS engine)", engineLabel(), on, this::pickEngine);
         action("Giọng đọc", voiceLabel(), on, this::pickVoice);
         action("Nghe thử", "Đọc một câu mẫu với bộ đọc, giọng và tốc độ đang chọn", on, this::preview);
@@ -192,7 +195,7 @@ public final class SettingsActivity extends Activity {
                 "Dừng rồi phát lại, sau cuộc gọi, khi đổi tốc độ hay mở lại truyện thì đọc tiếp từ chữ đó, không đọc lại từ đầu dòng",
                 true);
         boolean on = HtcSettings.bool(m);
-        choice(HtcSettings.WORD_FROM, "Đọc tiếp từ", on,
+        choice(HtcSettings.WORD_FROM, "Đọc tiếp từ (khi dừng/phát, sau cuộc gọi, mở lại truyện; đổi tốc độ luôn đúng chữ)", on,
                 new Object[]{"word", "back", "phrase", "seconds"},
                 new String[]{"Đúng chữ đang đọc", "Lùi 1–2 chữ", "Đầu cụm gần nhất (sau dấu phẩy, dấu chấm)", "Lùi khoảng 2 giây"});
         boolean reader = on && HtcPatches.tapToSeek();
@@ -296,6 +299,9 @@ public final class SettingsActivity extends Activity {
         String m = HtcSettings.TAP_ENABLED;
         toggle(m, "Chạm vào dòng để nghe từ dòng đó", "Đọc theo chiều dọc", true);
         boolean on = HtcSettings.bool(m);
+        choice(HtcSettings.TAP_MIN_PRESS, "Giữ tối thiểu khi chạm", on,
+                new Object[]{0, 100, 150, 250, 400},
+                new String[]{"Không cần (chạm là nhận)", "0.1 giây", "0.15 giây (lọc chạm lướt vô tình)", "0.25 giây", "0.4 giây"});
         toggle(HtcSettings.TAP_RETURN_BUTTON, "Nút \"Về dòng đang đọc\"",
                 "Hiện khi tự cuộn trang lúc đang nghe", on);
         choice(HtcSettings.TAP_AUTO_RETURN, "Tự quay về dòng đang đọc", on,

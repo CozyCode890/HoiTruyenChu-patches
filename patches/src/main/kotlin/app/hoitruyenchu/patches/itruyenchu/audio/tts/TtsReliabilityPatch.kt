@@ -44,7 +44,8 @@ val ttsReliabilityPatch = patch(
             "re-creates the TTS engine when it dies, pauses during calls and resumes afterwards, " +
             "retries failed lines, uses the correct Vietnamese voice, and applies a new speed right away " +
             "instead of after pause + play. A stopped line goes on from the word it was stopped at (pause, " +
-            "lock screen, call, speed change, reopening the book), not from its start.",
+            "lock screen, call, speed change, reopening the book), not from its start. \"~\" and \"...\" are " +
+            "read naturally (\"1~2\" = \"1 đến 2\", a short pause after \"...\", quotes around \"...\" are not read).",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_ITRUYENCHU)

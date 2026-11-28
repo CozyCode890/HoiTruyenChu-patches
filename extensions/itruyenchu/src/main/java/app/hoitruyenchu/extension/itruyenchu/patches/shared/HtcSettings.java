@@ -43,6 +43,8 @@ public final class HtcSettings {
     public static final String TTS_CALL = "tts.call";
     public static final String TTS_RETRIES = "tts.retries";
     public static final String TTS_ENGINE = "tts.engine";
+    /** Silence after "..." in a line, in ms (0 = none). */
+    public static final String TTS_ELLIPSIS_PAUSE = "tts.ellipsisPause";
     public static final String TTS_VOICE = "tts.voice";
     // Resume from the exact word (TTS reliability)
     public static final String WORD_ENABLED = "word.enabled";
@@ -81,6 +83,8 @@ public final class HtcSettings {
     public static final String TAP_CURRENT_LINE = "tap.currentLine";
     /** Tapping another line while reading: "jump", "mark" or "nothing". */
     public static final String TAP_OTHER_LINE = "tap.otherLine";
+    /** A tap on a line counts only when held at least this long, in ms (0 = any tap). */
+    public static final String TAP_MIN_PRESS = "tap.minPress";
     /** Where the line being read stays when the reader follows the voice: "top", "middle", "bottom", "page". */
     public static final String TAP_FOLLOW_POSITION = "tap.followPosition";
     // Floating settings button
@@ -110,6 +114,7 @@ public final class HtcSettings {
         DEFAULTS.put(TTS_CALL, "resume");
         DEFAULTS.put(TTS_RETRIES, 2);
         DEFAULTS.put(TTS_ENGINE, "");
+        DEFAULTS.put(TTS_ELLIPSIS_PAUSE, 500);
         DEFAULTS.put(TTS_VOICE, "");
         DEFAULTS.put(WORD_ENABLED, true);
         DEFAULTS.put(WORD_FROM, "word");
@@ -135,6 +140,7 @@ public final class HtcSettings {
         DEFAULTS.put(TAP_CURRENT_LINE, "nothing");
         DEFAULTS.put(TAP_OTHER_LINE, "jump");
         DEFAULTS.put(TAP_FOLLOW_POSITION, "bottom");
+        DEFAULTS.put(TAP_MIN_PRESS, 150);
         DEFAULTS.put(GEAR_ENABLED, true);
         DEFAULTS.put(GEAR_SCREENS, "reader");
         DEFAULTS.put(TITLES_ENABLED, true);

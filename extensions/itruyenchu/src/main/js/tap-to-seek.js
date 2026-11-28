@@ -57,6 +57,7 @@
     var lineTexts = [];       // text of the shown lines (app 3.0.0 Line components)
     var viewHeight = 0;       // height of the reader's ScrollView
     var contentTop = 0;       // y of ReadContent in the scrolled content
+    var contentHeight = 0;
     var scrollY = 0;          // its scroll position
     var detached = false;     // the user scrolled by hand: the reader does not follow the voice
     var listeners = [];
@@ -153,8 +154,10 @@
       var cover = barHeight > 0 ? barHeight : 90;
       var visible = viewHeight > 0 ? viewHeight - cover : 0;
       // Like the app: 100 (its own number, it ignores what is above the lines).
-      if (mode === 'top' || !(visible > 200) || !(h > 0) || h > visible - 60) return Math.max(0, y - TOP_GAP);
+      if (mode === 'top' || !(visible > 200) || !(h > 0)) return Math.max(0, y - TOP_GAP);
       y += contentTop;
+      // A line taller than the screen: its start just below the top (the rest scrolls in as it is read).
+      if (h > visible - 60) return Math.max(0, y - 16);
       if (mode === 'middle') return Math.max(0, Math.round(y + h / 2 - visible / 2));
       if (mode === 'bottom') return Math.max(0, Math.round(y + h - visible + 24));
       // "page"
@@ -225,8 +228,15 @@
 
     // Tapping a word (setting word.tap): "line" the line is read from its start; "word" from the
     // tapped word.
+    // A tap counts only when the finger stayed at least tap.minPress ms (default 150): a brush of the
+    // finger (scrolling, picking up the phone) is shorter and ignored.
+    var pressStart = { i: -1, t: 0 };
+    function onLinePressIn(index) { pressStart = { i: index, t: Date.now() }; }
     function onLineShortPress(index, e) {
       if (!S('tap.enabled', true)) return;
+      var min = Number(S('tap.minPress', 150)) || 0;
+      var held = pressStart.i === index ? Date.now() - pressStart.t : -1;
+      if (min > 0 && held >= 0 && held < min) { log('tap on line ' + index + ' ignored (' + held + ' ms < ' + min + ' ms)'); return; }
       onLineTap(index, wordPos(index, e));
     }
 
@@ -512,6 +522,12 @@
     function lineProps(props, index) {
       var extra = {};
       if (S('tap.enabled', true)) {
+        var onPressIn = props.onPressIn;
+        extra.onPressIn = function () {
+          onLinePressIn(index);
+          if (typeof onPressIn === 'function') return onPressIn.apply(this, arguments);
+          return undefined;
+        };
         extra.onPress = function (e) { onLineShortPress(index, e); };
       }
       if (typeof props.children === 'string') lineTexts[index] = props.children;
@@ -644,6 +660,7 @@
             onScrollEndDrag: dragEndHandler(props.onScrollEndDrag),
             onLayout: viewLayoutHandler(props.onLayout),
             onScroll: scrollHandler(props.onScroll),
+            onContentSizeChange: (function (orig) { return function (w, h) { contentHeight = h; if (typeof orig === 'function') return orig.apply(this, arguments); return undefined; }; })(props.onContentSizeChange),
             contentContainerStyle: contentStyle(props.contentContainerStyle),
             scrollEventThrottle: props.scrollEventThrottle || 100 }), wrap: true };
         }

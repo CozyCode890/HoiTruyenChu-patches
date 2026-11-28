@@ -104,6 +104,15 @@ public final class TtsController {
         long startedAt;
         /** Position the line was stopped at (before the "start from" setting), -1 none. */
         int parkedAt = -1;
+        /** Number of the current send to the engine: parts of older sends are ignored. */
+        int sendSerial;
+        /** Highest part of the current send (its onDone is the line's onDone). */
+        int lastPart;
+        /** The line as prepared for the engine (pieces between ellipses, index maps). */
+        SpeechText.Prepared prepared;
+        /** Piece being spoken (-1 none) and since when (estimate when the engine reports no words). */
+        int piece = -1;
+        long pieceStartedAt;
 
         Utterance(String id, String text, String language, Float pitch, Float rate, String voice) {
             this.id = id;
@@ -295,6 +304,108 @@ public final class TtsController {
         }, 2_000);
     }
 
+    // ---------------------------------------------------------------------------------------------
+    // A line is spoken in pieces (SpeechText: "~" and "..." made speakable), with a silence where
+    // an ellipsis was. Engine ids: <app id> PART <send> PART <part>; even parts are pieces (part / 2),
+    // odd parts silences. The app sees one utterance: started by part 0, done by the last part.
+
+    private static final char PART = '\u0001';
+    private static final Pattern ENDS_WITH_ELLIPSIS = Pattern.compile(
+            "(?:\u2026|\\.[ \\t\u00A0]*\\.)[\\s\"'\u201D\u2019)\\]]*$");
+    /** App ids whose onStop was already forwarded (a stopped line gets one per part). */
+    private static final LinkedHashMap<String, Boolean> stopForwarded = new LinkedHashMap<String, Boolean>() {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, Boolean> eldest) {
+            return size() > 64;
+        }
+    };
+
+    private static String partId(Utterance u, int part) {
+        return u.id + PART + u.sendSerial + PART + part;
+    }
+
+    private static final class PartRef {
+        final String base;
+        final Utterance u;
+        final int part;
+        /** The part belongs to the current send of a line still pending. */
+        final boolean current;
+
+        PartRef(String base, Utterance u, int part, boolean current) {
+            this.base = base;
+            this.u = u;
+            this.part = part;
+            this.current = current;
+        }
+
+        boolean last() {
+            return current && part == u.lastPart;
+        }
+    }
+
+    private static PartRef resolveLocked(String id) {
+        int a = id == null ? -1 : id.indexOf(PART);
+        if (a < 0) {
+            Utterance u = id == null ? null : pending.get(id);
+            return new PartRef(id, u, u != null ? u.lastPart : 0, u != null);
+        }
+        String base = id.substring(0, a);
+        int b = id.indexOf(PART, a + 1);
+        int serial = -1, part = 0;
+        try {
+            serial = Integer.parseInt(id.substring(a + 1, b));
+            part = Integer.parseInt(id.substring(b + 1));
+        } catch (Throwable ignored) {
+        }
+        Utterance u = pending.get(base);
+        return new PartRef(base, u, part, u != null && u.sendSerial == serial);
+    }
+
+    private static int ellipsisPauseMs() {
+        return Math.max(0, Math.min(2_000, HtcSettings.integer(HtcSettings.TTS_ELLIPSIS_PAUSE)));
+    }
+
+    /** Sends the line (from u.offset) as pieces and silences. @return the engine's result. */
+    private static int speakPartsLocked(Utterance u) {
+        u.sendSerial++;
+        int from = u.offset > 0 && u.offset < u.text.length() ? u.offset : 0;
+        SpeechText.Prepared prepared;
+        try {
+            prepared = SpeechText.prepare(u.text, from);
+        } catch (Throwable t) {
+            Log.w(TAG, "could not prepare the line, speaking it as is", t);
+            prepared = null;
+        }
+        u.prepared = prepared;
+        u.piece = -1;
+        if (prepared == null) {
+            u.lastPart = 0;
+            return tts.speak(from > 0 ? u.text.substring(from) : u.text, TextToSpeech.QUEUE_ADD, null, partId(u, 0));
+        }
+        int pause = ellipsisPauseMs();
+        int n = prepared.pieces.size();
+        if (n == 0) {
+            // Nothing to say (only "..." and quotes): a silence.
+            u.lastPart = 0;
+            return tts.playSilentUtterance(Math.max(pause, 200), TextToSpeech.QUEUE_ADD, partId(u, 0));
+        }
+        boolean endPause = pause > 0 && ENDS_WITH_ELLIPSIS.matcher(u.text).find();
+        if (n > 1 || endPause || !prepared.pieces.get(0).equals(u.text.substring(from).trim())) {
+            Log.i(TAG, "line spoken as " + n + " piece(s)" + (endPause ? " + pause at the end" : "")
+                    + ": " + prepared.pieces);
+        }
+        int result = TextToSpeech.SUCCESS;
+        for (int k = 0; k < n && result == TextToSpeech.SUCCESS; k++) {
+            u.lastPart = 2 * k;
+            result = tts.speak(prepared.pieces.get(k), TextToSpeech.QUEUE_ADD, null, partId(u, 2 * k));
+            if (result == TextToSpeech.SUCCESS && pause > 0 && (k < n - 1 || endPause)) {
+                u.lastPart = 2 * k + 1;
+                result = tts.playSilentUtterance(pause, TextToSpeech.QUEUE_ADD, partId(u, 2 * k + 1));
+            }
+        }
+        return result;
+    }
+
     private static boolean isWordChar(char c) {
         return !Character.isWhitespace(c);
     }
@@ -346,6 +457,12 @@ public final class TtsController {
     private static int progressOfLocked(Utterance u) {
         if (!u.sent) return u.parkedAt >= 0 ? u.parkedAt : u.offset;
         if (u.progress >= 0) return u.progress;
+        if (u.prepared != null && u.piece >= 0 && u.piece < u.prepared.pieces.size() && u.pieceStartedAt > 0) {
+            int[] map = u.prepared.starts.get(u.piece);
+            float r = appliedRate != null ? appliedRate : 1f;
+            int chars = Math.round((SystemClock.elapsedRealtime() - u.pieceStartedAt) / 1000f * charsPerSecond * r);
+            return map.length == 0 ? u.offset : map[Math.max(0, Math.min(map.length - 1, chars - 2))];
+        }
         if (u.startedAt <= 0) return u.offset;
         // No word events from this engine: estimate from the time spoken.
         float rate = appliedRate != null ? appliedRate : 1f;
@@ -368,6 +485,9 @@ public final class TtsController {
         }
         u.progress = -1;
         u.startedAt = 0;
+        u.piece = -1;
+        // The parts already queued belong to the stopped send: their callbacks are ignored.
+        u.sendSerial++;
     }
 
     /** Reading speed measured on finished lines, for the time left shown by the speed menu. */
@@ -613,8 +733,7 @@ public final class TtsController {
             boolean restart = false;
             for (Utterance u : pending.values()) {
                 if (!u.sent) continue;
-                respoken.add(u.id);
-                parkLocked(u, true);
+                parkLocked(u, true); // the stopped parts are ignored (older send)
                 u.sent = false;
                 restart = true;
             }
@@ -868,9 +987,10 @@ public final class TtsController {
         int result;
         try {
             applyOptionsLocked(u);
-            String text = u.offset > 0 && u.offset < u.text.length() ? u.text.substring(u.offset) : u.text;
-            if (text != u.text) Log.i(TAG, "speaking from character " + u.offset + "/" + u.text.length());
-            result = tts.speak(text, TextToSpeech.QUEUE_ADD, null, u.id);
+            if (u.offset > 0 && u.offset < u.text.length()) {
+                Log.i(TAG, "speaking from character " + u.offset + "/" + u.text.length());
+            }
+            result = speakPartsLocked(u);
         } catch (Throwable t) {
             Log.w(TAG, "speak threw", t);
             result = TextToSpeech.ERROR;
@@ -978,34 +1098,44 @@ public final class TtsController {
             if (stale()) return;
             String text;
             Float rate;
-            Utterance u;
+            String base;
             synchronized (lock) {
                 stallTicks = 0;
-                u = pending.get(id);
-                text = u != null ? u.text : null;
-                rate = appliedRate;
-                if (u != null) {
-                    u.startedAt = SystemClock.elapsedRealtime();
-                    u.progress = -1;
-                    u.parkedAt = -1;
+                PartRef r = resolveLocked(id);
+                if (!r.current) return;
+                Utterance u = r.u;
+                base = r.base;
+                if (r.part % 2 == 0) {
+                    u.piece = r.part / 2;
+                    u.pieceStartedAt = SystemClock.elapsedRealtime();
                 }
+                if (r.part != 0) return;
+                text = u.text;
+                rate = appliedRate;
+                u.startedAt = SystemClock.elapsedRealtime();
+                u.progress = -1;
+                u.parkedAt = -1;
             }
             ReadingProgress.onLineStarted(text, rate);
             notifyMedia();
             UtteranceProgressListener l = appListener;
-            if (l != null) l.onStart(id);
+            if (l != null) l.onStart(base);
         }
 
         @Override
         public void onDone(String id) {
             if (stale()) return;
             String text;
+            String base;
             boolean measured = false;
             synchronized (lock) {
-                Utterance u = pending.remove(id);
+                PartRef r = resolveLocked(id);
+                if (!r.last()) return; // a piece / silence in the middle, or an older send
+                base = r.base;
+                Utterance u = pending.remove(base);
                 text = u != null ? u.text : null;
-                suppressStop.remove(id);
-                respoken.remove(id);
+                suppressStop.remove(base);
+                respoken.remove(base);
                 touchLocked();
                 lastDoneAt = SystemClock.elapsedRealtime();
                 if (u != null) {
@@ -1026,34 +1156,54 @@ public final class TtsController {
             notifyMedia();
             notifyMediaLater(PLAYING_GRACE_MS + 200);
             UtteranceProgressListener l = appListener;
-            if (l != null) l.onDone(id);
+            if (l != null) l.onDone(base);
         }
 
         @Override
         public void onStop(String id, boolean wasInterrupted) {
             if (stale()) return;
+            String base;
             synchronized (lock) {
-                if (respoken.remove(id) || suppressStop.remove(id)) return;
-                pending.remove(id);
+                PartRef r = resolveLocked(id);
+                base = r.base;
+                if (r.u != null && !r.current) return; // an older send, stopped by us
+                if (r.u != null) {
+                    if (respoken.remove(base) || suppressStop.remove(base)) return;
+                    pending.remove(base);
+                }
+                // One onStop per line for the app (every queued part of a stopped line gets one).
+                if (base == null || stopForwarded.containsKey(base)) return;
+                stopForwarded.put(base, Boolean.TRUE);
             }
             UtteranceProgressListener l = appListener;
-            if (l != null) l.onStop(id, wasInterrupted);
+            if (l != null) l.onStop(base, wasInterrupted);
         }
 
         @Override
         public void onRangeStart(String id, int start, int end, int frame) {
             if (stale()) return;
-            Utterance u;
+            String base;
             synchronized (lock) {
-                u = pending.get(id);
-                if (u != null && u.sent) u.progress = Math.min(u.text.length(), u.offset + Math.max(0, start));
+                PartRef r = resolveLocked(id);
+                if (!r.current) return;
+                base = r.base;
+                Utterance u = r.u;
+                int k = r.part / 2;
+                if (u.sent && r.part % 2 == 0) {
+                    if (u.prepared != null && k < u.prepared.starts.size()) {
+                        int[] map = u.prepared.starts.get(k);
+                        if (map.length > 0) u.progress = map[Math.max(0, Math.min(map.length - 1, start))];
+                    } else {
+                        u.progress = Math.min(u.text.length(), u.offset + Math.max(0, start));
+                    }
+                }
                 if (!rangeEventsSeen) {
                     rangeEventsSeen = true;
                     Log.i(TAG, "the engine reports the word being spoken");
                 }
             }
             UtteranceProgressListener l = appListener;
-            if (l != null) l.onRangeStart(id, start, end, frame);
+            if (l != null) l.onRangeStart(base, start, end, frame);
         }
 
         @SuppressWarnings("deprecation")
@@ -1068,9 +1218,18 @@ public final class TtsController {
         }
     }
 
-    private static void handleError(final int gen, String id, final int code) {
+    private static void handleError(final int gen, String engineId, final int code) {
+        String id;
         synchronized (lock) {
             if (gen != generation) return;
+            PartRef r = resolveLocked(engineId);
+            if (r.u != null && !r.current) return; // an older send
+            if (r.u != null && !r.last()) {
+                // A piece in the middle failed: the rest of the line is still queued and goes on.
+                Log.w(TAG, "part " + r.part + " of utterance " + r.base + " failed (" + code + ")");
+                return;
+            }
+            id = r.base;
             if (respoken.remove(id)) return;
             Utterance u = pending.get(id);
             if (u != null) {
@@ -1133,10 +1292,7 @@ public final class TtsController {
             Log.i(TAG, "paused from the media controls");
             userPaused = true;
             for (Utterance u : pending.values()) {
-                if (u.sent) {
-                    suppressStop.add(u.id);
-                    parkLocked(u, false);
-                }
+                if (u.sent) parkLocked(u, false); // the stopped parts are ignored (older send)
                 u.sent = false;
             }
             try {
@@ -1253,10 +1409,7 @@ public final class TtsController {
                 Log.i(TAG, "call detected (audio mode " + mode + "), pausing speech");
                 interrupted = true;
                 for (Utterance u : pending.values()) {
-                    if (u.sent) {
-                        suppressStop.add(u.id);
-                        parkLocked(u, false);
-                    }
+                    if (u.sent) parkLocked(u, false); // the stopped parts are ignored (older send)
                     u.sent = false;
                 }
                 try {
