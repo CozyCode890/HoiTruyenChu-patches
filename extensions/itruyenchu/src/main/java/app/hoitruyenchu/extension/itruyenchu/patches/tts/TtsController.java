@@ -166,7 +166,6 @@ public final class TtsController {
     /** Engine package the current engine was created with ("" = system default). */
     private static String engineInUse = "";
     private static boolean settingsListening;
-    private static boolean noisyRegistered;
 
     private TtsController() {
     }
@@ -175,7 +174,7 @@ public final class TtsController {
     // Resume from the exact word
     //
     // The engine reports the word it is saying (onRangeStart). When a line is stopped in the middle
-    // (pause button, media controls, call, headphones, sleep timer, speed change) the position is
+    // (pause button, media controls, call, speed change) the position is
     // kept: lines kept in "pending" are sent again from that word, and for a stop by the app
     // (Speech.stop(), the line is dropped) the position is remembered per line text, also across
     // restarts (SharedPreferences htc_word_points). The next time that line is the first one spoken
@@ -193,7 +192,7 @@ public final class TtsController {
     private static final HashMap<String, long[]> hints = new HashMap<>();
     /** Characters per second at speed 1 (measured on finished lines). */
     private static float charsPerSecond = 14f;
-    private static final String WORD_EVENT = "htcWord";
+    private static final String SPEED_EVENT = "htcReadSpeed";
     private static boolean rangeEventsSeen;
 
     private static boolean wordEnabled() {
@@ -371,13 +370,10 @@ public final class TtsController {
         u.startedAt = 0;
     }
 
-    private static void emitWord(final Utterance u, final int start, final int end) {
-        if (u == null || "off".equals(HtcSettings.string(HtcSettings.WORD_KARAOKE))
-                || !HtcSettings.bool(HtcSettings.WORD_ENABLED)) return;
+    /** Reading speed measured on finished lines, for the time left shown by the speed menu. */
+    private static void emitSpeed() {
         try {
-            JSONObject o = new JSONObject().put("s", start).put("e", end).put("k", lineKey(u.text))
-                    .put("c", (double) charsPerSecond);
-            JsBridge.emit(WORD_EVENT, o.toString());
+            JsBridge.emit(SPEED_EVENT, new JSONObject().put("c", (double) charsPerSecond).toString());
         } catch (Throwable ignored) {
         }
     }
@@ -399,8 +395,9 @@ public final class TtsController {
         return enabled() ? HtcSettings.string(HtcSettings.TTS_CALL) : "none";
     }
 
+    /** A new speed is used at once (the line goes on from its word at the new speed). */
     private static boolean applySpeedNow() {
-        return HtcSettings.on(HtcSettings.TTS_ENABLED, HtcSettings.TTS_APPLY_SPEED);
+        return enabled();
     }
 
     private static String chosenEngine() {
@@ -422,44 +419,6 @@ public final class TtsController {
                 }
             }
         });
-    }
-
-    /** Headphones unplugged / Bluetooth audio disconnected: pause like the app's pause button. */
-    private static void registerNoisyLocked() {
-        if (noisyRegistered || appContext == null) return;
-        noisyRegistered = true;
-        try {
-            BroadcastReceiver receiver = new BroadcastReceiver() {
-                @Override
-                public void onReceive(Context context, Intent intent) {
-                    if (!AudioManager.ACTION_AUDIO_BECOMING_NOISY.equals(intent.getAction())) return;
-                    if (!HtcSettings.on(HtcSettings.TTS_ENABLED, HtcSettings.TTS_NOISY) || !isReading()) return;
-                    Log.i(TAG, "headphones / Bluetooth disconnected, pausing");
-                    requestPause();
-                }
-            };
-            IntentFilter filter = new IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY);
-            if (Build.VERSION.SDK_INT >= 33) {
-                appContext.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED);
-            } else {
-                appContext.registerReceiver(receiver, filter);
-            }
-        } catch (Throwable t) {
-            Log.w(TAG, "could not watch headphones", t);
-        }
-    }
-
-    /**
-     * Pauses the reading the way the app's pause button does: the engine stops at once (the line is
-     * kept), and the scripts are asked to press the voice bar's pause button so the app shows it.
-     */
-    public static void requestPause() {
-        pauseByUser();
-        try {
-            JSONObject command = new JSONObject().put("cmd", "pause").put("id", SystemClock.elapsedRealtime());
-            JsBridge.emit(JsBridge.EVENT_COMMAND, command.toString());
-        } catch (Throwable ignored) {
-        }
     }
 
     static boolean isEndOfChapter(String text) {
@@ -502,7 +461,6 @@ public final class TtsController {
             }
             if (listener != null) appListener = listener;
             listenToSettingsLocked();
-            registerNoisyLocked();
             if (tts == null) createLocked("first use");
             return tts;
         }
@@ -533,13 +491,6 @@ public final class TtsController {
             // changes chapter, so a stop in between does not count).
             boolean continuous = !userPaused && lastDoneAt > 0
                     && SystemClock.elapsedRealtime() - lastDoneAt < CONTINUOUS_MS;
-            if (HtcPatches.backgroundReading() && SleepTimer.shouldStop(continuous)) {
-                // Sleep timer over: keep the line, stop here and let the app show "paused".
-                spokeSinceStop = true;
-                pending.put(id, new Utterance(id, text, language, pitch, rate, voice));
-                stopForSleepLocked();
-                return;
-            }
             spokeSinceStop = true;
             if (userPaused) {
                 // Play pressed in the app (e.g. a voice bar mounted again, showing "play") while the
@@ -587,20 +538,6 @@ public final class TtsController {
         int from = resumeFrom(text, (int) point[0], appliedRate != null ? appliedRate : 1f, false);
         if (from > 0) Log.i(TAG, "going on from character " + from + " of the line (stopped at " + point[0] + ")");
         return from;
-    }
-
-    /** Sleep timer over before a new line: the line stays queued, the app is asked to show "paused". */
-    private static void stopForSleepLocked() {
-        userPaused = true;
-        final long id = SystemClock.elapsedRealtime();
-        main.post(() -> {
-            notifyMedia();
-            try {
-                JSONObject command = new JSONObject().put("cmd", "pause").put("id", id).put("sleep", true);
-                JsBridge.emit(JsBridge.EVENT_COMMAND, command.toString());
-            } catch (Throwable ignored) {
-            }
-        });
     }
 
     /** Replaces textToSpeech.stop() called by JS Speech.stop(). */
@@ -1053,7 +990,6 @@ public final class TtsController {
                     u.parkedAt = -1;
                 }
             }
-            if (u != null) emitWord(u, u.offset, u.offset);
             ReadingProgress.onLineStarted(text, rate);
             notifyMedia();
             UtteranceProgressListener l = appListener;
@@ -1064,6 +1000,7 @@ public final class TtsController {
         public void onDone(String id) {
             if (stale()) return;
             String text;
+            boolean measured = false;
             synchronized (lock) {
                 Utterance u = pending.remove(id);
                 text = u != null ? u.text : null;
@@ -1081,9 +1018,10 @@ public final class TtsController {
                         float cps = chars / (ms / 1000f) / rate;
                         if (cps > 3 && cps < 60) charsPerSecond = charsPerSecond * 0.8f + cps * 0.2f;
                     }
+                    measured = true;
                 }
             }
-            if (HtcPatches.backgroundReading()) SleepTimer.onLineDone(text);
+            if (measured) emitSpeed();
             ReadingProgress.onLineDone();
             notifyMedia();
             notifyMediaLater(PLAYING_GRACE_MS + 200);
@@ -1114,7 +1052,6 @@ public final class TtsController {
                     Log.i(TAG, "the engine reports the word being spoken");
                 }
             }
-            if (u != null && u.sent) emitWord(u, u.offset + start, u.offset + end);
             UtteranceProgressListener l = appListener;
             if (l != null) l.onRangeStart(id, start, end, frame);
         }

@@ -19,7 +19,7 @@ val tapToSeekPatch = patch(
             "while reading can be set (tapped line being read: nothing / pause / read again; another line: " +
             "jump / stop and mark / nothing). Scrolling by hand while listening stops the automatic " +
             "scrolling and shows a \"Về dòng đang đọc\" button. Also: where the line being read stays when " +
-            "the reader follows the voice (bottom / top / middle / page), highlight of the word being read and " +
+            "the reader follows the voice (bottom / top / middle / page), and " +
             "reading from a tapped word (settings).",
     default = true,
 ) {

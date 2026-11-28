@@ -64,7 +64,7 @@ val settingsPatch = patch(
         mutableClassDefBy(EXTENSION_PATCH_FLAGS).methods.first { it.name == "version" }
             .returnEarly(PATCHES_VERSION)
 
-        // Commands of the scripts (open the screen, sleep timer) written to AsyncStorage.
+        // Commands of the scripts (open the screen, word positions) written to AsyncStorage.
         AsyncStorageMultiSetFingerprint.method.addInstructions(
             0,
             "invoke-static { p1 }, $EXTENSION_SETTINGS->onStorageSet($READABLE_ARRAY)V",

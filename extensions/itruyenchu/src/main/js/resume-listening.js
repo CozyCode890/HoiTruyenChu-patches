@@ -49,26 +49,10 @@
     // Which chapter the reader shows: ReadEngine {content, chapterNumber, ...} renders with new
     // content (per mounted reader). The book: bookSlug of ReadEngine (2.1.0) or of the reader's
     // header / voice bar, created just before it (3.0.0).
-    // For the mini player: the chapter shown, and the line it reached while the reader was closed.
-    g.__htcChapter = function () { return loaded; };
-    g.__htcSaveListen = function (slug, n, line) {
-      try {
-        if (!slug || !(n > 0) || !(line >= 0)) return;
-        saved[slug] = { c: n, l: line, t: Date.now() };
-        persist();
-      } catch (e) {}
-    };
-
     function chapterShown(slug, n) {
       try {
         if (!slug || !(n > 0)) return;
         loaded = { slug: slug, n: n };
-        // Opened from the mini player: highlight its line, and play if it was playing.
-        var req = g.__htcResumeRequest;
-        if (req && req.slug === slug && req.n === n && Date.now() - req.t < 60000) {
-          g.__htcResumeRequest = null;
-          if (req.line >= 0) { show(slug, n, req.line, !!req.play); return; }
-        }
         if (!S('resume.enabled', true)) return;
         var p = saved[slug];
         if (p && p.c === n && p.l > 0) restore(slug, n, p.l);

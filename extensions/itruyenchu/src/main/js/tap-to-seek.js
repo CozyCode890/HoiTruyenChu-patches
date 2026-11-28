@@ -223,41 +223,19 @@
       setTimeout(tick, 150);
     }
 
-    // Gesture of the settings: "tap", "double" (two taps within 350 ms) or "long" (onLongPress).
-    // Lines get both handlers and the setting is read when pressed (app 3.0.0's lines are memo
-    // components that do not render again when a setting changes).
     // Tapping a word (setting word.tap): "line" the line is read from its start; "word" from the
-    // tapped word; "hold" a tap reads from the line start, a long press from the word.
-    var lastTap = { i: -1, t: 0 };
+    // tapped word.
     function onLineShortPress(index, e) {
-      if (S('tap.gesture', 'tap') === 'long') return;
-      onLinePress(index, wordPos(index, e, false));
-    }
-    function onLineLongPress(index, e) {
-      if (S('tap.gesture', 'tap') !== 'long') {
-        var hold = S('word.tap', 'line') === 'hold' && S('word.enabled', true) && S('tap.gesture', 'tap') === 'tap';
-        if (hold) { if (S('tap.enabled', true)) onLineTap(index, wordPos(index, e, true)); return; }
-        onLinePress(index, wordPos(index, e, false));
-        return;
-      }
-      if (S('tap.enabled', true)) onLineTap(index, wordPos(index, e, false));
-    }
-    function onLinePress(index, pos) {
       if (!S('tap.enabled', true)) return;
-      if (S('tap.gesture', 'tap') !== 'double') { onLineTap(index, pos); return; }
-      var now = Date.now();
-      if (lastTap.i === index && now - lastTap.t < 350) { lastTap.i = -1; onLineTap(index, pos); return; }
-      lastTap = { i: index, t: now };
+      onLineTap(index, wordPos(index, e));
     }
 
     // Character of shown line index under the finger (onTextLayout lines + touch position, the
     // place inside a visual line is estimated from its width), at a word start; -1 = line start.
-    function wordPos(index, e, hold) {
+    function wordPos(index, e) {
       try {
         if (!S('word.enabled', true)) return -1;
-        var mode = S('word.tap', 'line');
-        if (mode === 'line') return -1;
-        if (mode === 'hold' && !hold && S('tap.gesture', 'tap') === 'tap') return -1;
+        if (S('word.tap', 'line') !== 'word') return -1;
         var lines = textLayouts[index];
         var text = lineTexts[index];
         var ne = e && e.nativeEvent;
@@ -487,53 +465,10 @@
       return ReadContent;
     }
 
-    // ---- Word highlight (setting word.karaoke), from the "htcWord" events of TtsController:
-    // {s, e, k}: the word being spoken is text[s, e) of the line whose key (length:Java hashCode of
-    // the trimmed text) is k.
-    var word = { k: '', s: 0, e: 0 };
-    var wordSubs = [];
-    var lineActive = false;   // the Line rendering is the line being read
-    var WORD_BOLD = { backgroundColor: 'rgba(0,0,0,0.30)' };
-    var WORD_UNDER = { textDecorationLine: 'underline' };
-    function lineKey(t) {
-      var s0 = String(t).trim(), h = 0;
-      for (var i = 0; i < s0.length; i++) h = (Math.imul(31, h) + s0.charCodeAt(i)) | 0;
-      return s0.length + ':' + h;
-    }
-    function dimColor(style) {
-      var c = null;
-      try {
-        var list = style && typeof style.length === 'number' ? style : [style];
-        for (var i = 0; i < list.length; i++) if (list[i] && list[i].color) c = list[i].color;
-      } catch (e) {}
-      var r = 128, gg = 128, b = 128, m;
-      c = String(c || '').trim().toLowerCase();
-      if ((m = /^#([0-9a-f]{3})$/.exec(c))) {
-        r = parseInt(m[1][0] + m[1][0], 16); gg = parseInt(m[1][1] + m[1][1], 16); b = parseInt(m[1][2] + m[1][2], 16);
-      } else if ((m = /^#([0-9a-f]{6})/.exec(c))) {
-        r = parseInt(m[1].substr(0, 2), 16); gg = parseInt(m[1].substr(2, 2), 16); b = parseInt(m[1].substr(4, 2), 16);
-      } else if ((m = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/.exec(c))) {
-        r = +m[1]; gg = +m[2]; b = +m[3];
-      } else if (c === 'white') { r = gg = b = 255; } else if (c === 'black') { r = gg = b = 0; }
-      return 'rgba(' + r + ',' + gg + ',' + b + ',0.45)';
-    }
-    function karaoke(text, style) {
-      var mode = S('word.karaoke', 'off');
-      if (mode === 'off' || !S('word.enabled', true) || !word.k || word.k !== lineKey(text)) return null;
-      var s0 = Math.max(0, Math.min(text.length, word.s)), e0 = Math.max(s0, Math.min(text.length, word.e));
-      if (e0 <= s0) { e0 = s0; while (e0 < text.length && !/\s/.test(text.charAt(e0))) e0++; }
-      var before = text.substring(0, s0), w = text.substring(s0, e0), after = text.substring(e0);
-      if (mode === 'dim') return [before, w, jsx0(Text, { style: { color: dimColor(style) }, children: after }, 'htc-a')];
-      return [before, jsx0(Text, { style: mode === 'underline' ? WORD_UNDER : WORD_BOLD, children: w }, 'htc-w'), after];
-    }
-    RN.DeviceEventEmitter.addListener('htcWord', function (msg) {
-      try {
-        var o = JSON.parse(String(msg));
-        word = { k: String(o.k), s: Number(o.s) || 0, e: Number(o.e) || 0 };
-        if (Number(o.c) > 0) g.__htcCps = Number(o.c);
-        var copy = wordSubs.slice();
-        for (var i = 0; i < copy.length; i++) { try { copy[i](); } catch (e) {} }
-      } catch (e) {}
+    // Reading speed measured by TtsController (characters per second at 1x), for the time left
+    // shown by the speed menu.
+    RN.DeviceEventEmitter.addListener('htcReadSpeed', function (msg) {
+      try { var o = JSON.parse(String(msg)); if (Number(o.c) > 0) g.__htcCps = Number(o.c); } catch (e) {}
     });
 
     // App 3.0.0: memo(Line) renders one line of ReadContent, {index, text, textStyle, activeStyle,
@@ -541,24 +476,10 @@
     function wrapLine(memo) {
       var orig = memo.type;
       var Line = function (props) {
-        // The line being read renders again for every word the engine reports (word highlight).
-        var active = !!(props && props.activeStyle);
-        var tick = React.useState(0);
-        var setTick = tick[1];
-        React.useEffect(function () {
-          if (!active) return undefined;
-          var fn = function () { setTick(function (n) { return (n + 1) % 1000000; }); };
-          wordSubs.push(fn);
-          return function () {
-            var i = wordSubs.indexOf(fn);
-            if (i >= 0) wordSubs.splice(i, 1);
-          };
-        }, [active]);
-        var saved = lineIndex, savedActive = lineActive;
+        var saved = lineIndex;
         lineIndex = props && typeof props.index === 'number' ? props.index : -1;
-        lineActive = active;
         if (lineIndex >= 0 && typeof props.text === 'string') lineTexts[lineIndex] = props.text;
-        try { return orig.apply(this, arguments); } finally { lineIndex = saved; lineActive = savedActive; }
+        try { return orig.apply(this, arguments); } finally { lineIndex = saved; }
       };
       for (var k in orig) { if (k.indexOf('__htc') === 0) Line[k] = orig[k]; }
       Line.__htcTap = true;
@@ -588,11 +509,10 @@
 
     // One line: <Text key={index} onLayout? style={[line, active && highlight]}> rendered by ReadContent
     // (2.1.0), or the Text of a Line component (3.0.0).
-    function lineProps(props, index, active) {
+    function lineProps(props, index) {
       var extra = {};
       if (S('tap.enabled', true)) {
         extra.onPress = function (e) { onLineShortPress(index, e); };
-        extra.onLongPress = function (e) { onLineLongPress(index, e); };
       }
       if (typeof props.children === 'string') lineTexts[index] = props.children;
       var onLayout = props.onLayout;
@@ -611,10 +531,6 @@
         if (typeof onTextLayout === 'function') return onTextLayout.apply(this, arguments);
         return undefined;
       };
-      if (active && typeof props.children === 'string') {
-        var spans = karaoke(props.children, props.style);
-        if (spans) extra.children = spans;
-      }
       if (map) {
         // The reader highlights the shown line with the number of the voice line: fix it.
         var style = props.style;
@@ -718,8 +634,8 @@
       if (!props || typeof props !== 'object') return null;
       if (type === ScrollView && !S('tap.enabled', true)) return null;
       if (type === Text) {
-        if (contentDepth > 0 && typeof key === 'number') return { type: type, props: lineProps(props, key, false) };
-        if (lineIndex >= 0) return { type: type, props: lineProps(props, lineIndex, lineActive) };
+        if (contentDepth > 0 && typeof key === 'number') return { type: type, props: lineProps(props, key) };
+        if (lineIndex >= 0) return { type: type, props: lineProps(props, lineIndex) };
         return null;
       }
       if (type === ScrollView) {

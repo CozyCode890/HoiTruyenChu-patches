@@ -148,8 +148,6 @@
     var CHIP_TEXT = { color: '#ffffff', fontSize: 15, fontWeight: '500' };
     var CHIP_TEXT_ON = { color: '#111111' };
     var NORMAL = { color: 'rgba(255,255,255,0.6)', fontSize: 11, marginTop: 4, textAlign: 'center' };
-    var RESET = { position: 'absolute', right: 0, top: 4, paddingHorizontal: 10, paddingVertical: 6,
-      borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.12)' };
 
     // Slider: track + filled part + thumb, dragged with a PanResponder. Calls onMove(v) while
     // dragging and onCommit(v) when released. Snaps to marks (1.0x, quick choices) when near.
@@ -259,15 +257,10 @@
         setValue(v);
       };
       var header = [jsx0(Text, { style: BIG, children: value.toFixed(2) + 'x' }, 'big')];
-      if (S('speed.resetButton', false) && Math.abs(value - 1) > 0.001) {
-        header.push(jsx0(Touch, { style: RESET, onPress: function () { commit(1); },
-          children: jsx0(Text, { style: { color: '#ffffff', fontSize: 13 }, children: '1.0x' }) }, 'reset'));
-      }
       var kids = [jsxs0(View, { children: header }, 'head')];
-      if (S('speed.remaining', false)) {
-        var left = remaining(value);
-        if (left) kids.push(jsx0(Text, { style: SMALL, children: left }, 'left'));
-      }
+      // Time left in the chapter at this speed (estimate).
+      var left = remaining(value);
+      if (left) kids.push(jsx0(Text, { style: SMALL, children: left }, 'left'));
       kids.push(jsxs0(View, { style: ROW, children: [
         jsx0(StepButton, { text: '−', label: 'Giảm tốc độ', onStep: function () { step(-1); },
           onCommit: function () { commit(valueRef.current); } }, 'minus'),
@@ -304,9 +297,6 @@
         children: kids
       });
     }
-
-    // Also used by the mini player (player script).
-    g.__htcSpeedPanel = SpeedPanel;
 
     var picker = null;   // props of the SpeedControl rendering, null outside
     function wrapPicker(orig) {

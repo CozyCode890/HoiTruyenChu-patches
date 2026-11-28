@@ -56,34 +56,6 @@
       return true;
     }
 
-    // Widget next / previous set to move lines: like tapping that line (stop, mark, play again).
-    function moveLines(delta) {
-      if (mounted <= 0 || typeof bar.play !== 'function') return false;
-      var s = V.getState();
-      var target = Math.max(0, (s.activeLine > 0 ? s.activeLine : 0) + delta);
-      log('move ' + delta + ' lines to ' + target);
-      if (target === s.activeLine) return true;
-      s.setActiveLine(target);
-      if (!bar.playing) return true;
-      bar.play();
-      var tries = 0;
-      var again = function () {
-        try {
-          if (!bar.playing && typeof bar.play === 'function') {
-            if (V.getState().activeLine !== target) V.getState().setActiveLine(target);
-            bar.play();
-            return;
-          }
-          if (++tries < 20) setTimeout(again, 100);
-        } catch (e) { log('move failed ' + e); }
-      };
-      setTimeout(again, 100);
-      return true;
-    }
-
-    // Used by the mini player while the reader is under another screen.
-    g.__htcBarCtl = { next: goNext, prev: goPrev };
-
     function onPrevPressed() {
       try { if (!goPrev()) log('no previous chapter'); } catch (e) { log('prev failed ' + e); }
     }
@@ -183,10 +155,6 @@
       }
       if (cmd === 'next') return goNext();
       if (cmd === 'prev') return goPrev();
-      if (cmd.indexOf('line') === 0) {
-        var delta = parseInt(cmd.substring(4), 10);
-        return delta ? moveLines(delta) : false;
-      }
       return false;
     }
 
@@ -199,8 +167,6 @@
     }
 
     RN.DeviceEventEmitter.addListener('htcMediaCommand', function (msg) {
-      // The mini player reads (the reader is closed): it answers.
-      try { if (mounted <= 0 && typeof g.__htcPlayerActive === 'function' && g.__htcPlayerActive()) return; } catch (e) {}
       var s = String(msg);
       var i = s.indexOf('#');
       var cmd = i >= 0 ? s.substring(0, i) : s;

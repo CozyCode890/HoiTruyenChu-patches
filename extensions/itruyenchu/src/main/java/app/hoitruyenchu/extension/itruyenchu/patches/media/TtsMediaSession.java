@@ -155,14 +155,8 @@ public final class TtsMediaSession {
         }
     }
 
-    /** Next / previous button: change the chapter, or move 1 / 5 lines (settings). */
+    /** Next / previous button: change the chapter. */
     static void onSkip(boolean next) {
-        String mode = HtcSettings.string(HtcSettings.MEDIA_SKIP);
-        int lines = "line1".equals(mode) ? 1 : "line5".equals(mode) ? 5 : 0;
-        if (lines > 0) {
-            sendToApp("line" + (next ? "+" : "-") + lines, () -> Log.i(TAG, "no line to move to (reader not shown)"));
-            return;
-        }
         sendToApp(next ? "next" : "prev", () -> Log.i(TAG, "no chapter to change (reader not shown)"));
     }
 

@@ -26,13 +26,11 @@ public final class AppInfo {
     /** jsx react/jsx-runtime, rn react-native, icons lucide-react-native, toast react-native-toast-message,
      *  auth useAuthStore, api the app's axios client, read useReadStore, replace useMagicReplaceStore +
      *  applyReplaceRules, voice useTTSVoiceStore, speech expo-speech, s3 getDataFromS3 (only needed for
-     *  3.0.0, see TitlesScript); 3.0.0 only, for the mini player: text parseLines, audio expo-audio,
-     *  silence the voice bar's silent mp3, chapters getChapterContent, banner getSmallBannerURL. */
+     *  3.0.0, see TitlesScript). */
     private static final String MODULES_V2 = "{\"jsx\":288,\"react\":114,\"rn\":74,\"icons\":883,"
             + "\"toast\":2680,\"auth\":2713,\"api\":2722,\"read\":2735,\"replace\":2765,\"voice\":2766,\"speech\":3234}";
     private static final String MODULES_V3 = "{\"jsx\":288,\"react\":114,\"rn\":74,\"icons\":880,\"s3\":2745,"
-            + "\"toast\":2677,\"auth\":2709,\"api\":2718,\"read\":2732,\"replace\":2766,\"voice\":2767,\"speech\":3237,"
-            + "\"text\":3251,\"audio\":3240,\"silence\":3250,\"chapters\":2742,\"banner\":2663}";
+            + "\"toast\":2677,\"auth\":2709,\"api\":2718,\"read\":2732,\"replace\":2766,\"voice\":2767,\"speech\":3237}";
 
     private static volatile int versionCode = -1;
 

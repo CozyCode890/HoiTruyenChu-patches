@@ -41,22 +41,17 @@ public final class HtcSettings {
     // TTS reliability
     public static final String TTS_ENABLED = "tts.enabled";
     public static final String TTS_CALL = "tts.call";
-    public static final String TTS_NOISY = "tts.noisy";
     public static final String TTS_RETRIES = "tts.retries";
-    public static final String TTS_APPLY_SPEED = "tts.applySpeed";
     public static final String TTS_ENGINE = "tts.engine";
     public static final String TTS_VOICE = "tts.voice";
     // Resume from the exact word (TTS reliability)
     public static final String WORD_ENABLED = "word.enabled";
     /** Where a stopped line goes on: "word", "back" (2 words back), "phrase" (after , . ; ...), "seconds" (~2 s back). */
     public static final String WORD_FROM = "word.from";
-    /** Word highlight inside the line being read: "off", "bold", "dim", "underline". */
-    public static final String WORD_KARAOKE = "word.karaoke";
-    /** Tapping a word of a line: "line" (from the line start), "word" (from the word), "hold" (tap = line, hold = word). */
+    /** Tapping a word of a line: "line" (from the line start), "word" (from the word). */
     public static final String WORD_TAP = "word.tap";
     // Background reading
     public static final String BG_ENABLED = "bg.enabled";
-    public static final String BG_SLEEP_BUTTON = "bg.sleepButton";
     // Remember listening speed
     public static final String SPEED_ENABLED = "speed.enabled";
     public static final String SPEED_EXTRA_LEVELS = "speed.extraLevels";
@@ -72,17 +67,13 @@ public final class HtcSettings {
     /** Speed menu: "youtube" (replaces the app's list) or "list" (app's list + YouTube controls above). */
     public static final String SPEED_MENU = "speed.menu";
     public static final String SPEED_SNAP = "speed.snap";
-    public static final String SPEED_REMAINING = "speed.remaining";
-    public static final String SPEED_RESET_BUTTON = "speed.resetButton";
     // TTS media controls
     public static final String MEDIA_ENABLED = "media.enabled";
-    public static final String MEDIA_SKIP = "media.skip";
     // Resume listening position
     public static final String RESUME_ENABLED = "resume.enabled";
     public static final String RESUME_MODE = "resume.mode";
     // Tap a line to listen from it
     public static final String TAP_ENABLED = "tap.enabled";
-    public static final String TAP_GESTURE = "tap.gesture";
     public static final String TAP_RETURN_BUTTON = "tap.returnButton";
     public static final String TAP_AUTO_RETURN = "tap.autoReturn";
     public static final String TAP_CLOSED_BAR = "tap.closedBar";
@@ -92,10 +83,6 @@ public final class HtcSettings {
     public static final String TAP_OTHER_LINE = "tap.otherLine";
     /** Where the line being read stays when the reader follows the voice: "top", "middle", "bottom", "page". */
     public static final String TAP_FOLLOW_POSITION = "tap.followPosition";
-    // Mini player
-    public static final String PLAYER_ENABLED = "player.enabled";
-    /** Leaving the reader while listening: "continue", "pause" (bar stays), "ask", "stop". */
-    public static final String PLAYER_ON_LEAVE = "player.onLeave";
     // Floating settings button
     public static final String GEAR_ENABLED = "gear.enabled";
     /** Screens showing it: "reader", "tabs", "home", "all". */
@@ -121,17 +108,13 @@ public final class HtcSettings {
         DEFAULTS.put(DEBUG, true);
         DEFAULTS.put(TTS_ENABLED, true);
         DEFAULTS.put(TTS_CALL, "resume");
-        DEFAULTS.put(TTS_NOISY, true);
         DEFAULTS.put(TTS_RETRIES, 2);
-        DEFAULTS.put(TTS_APPLY_SPEED, true);
         DEFAULTS.put(TTS_ENGINE, "");
         DEFAULTS.put(TTS_VOICE, "");
         DEFAULTS.put(WORD_ENABLED, true);
         DEFAULTS.put(WORD_FROM, "word");
-        DEFAULTS.put(WORD_KARAOKE, "off");
         DEFAULTS.put(WORD_TAP, "line");
         DEFAULTS.put(BG_ENABLED, true);
-        DEFAULTS.put(BG_SLEEP_BUTTON, true);
         DEFAULTS.put(SPEED_ENABLED, true);
         DEFAULTS.put(SPEED_EXTRA_LEVELS, true);
         DEFAULTS.put(SPEED_MIN, 50);
@@ -142,22 +125,16 @@ public final class HtcSettings {
         DEFAULTS.put(SPEED_CHIPS, "0.8, 1, 1.2, 1.5, 2");
         DEFAULTS.put(SPEED_MENU, "youtube");
         DEFAULTS.put(SPEED_SNAP, true);
-        DEFAULTS.put(SPEED_REMAINING, false);
-        DEFAULTS.put(SPEED_RESET_BUTTON, false);
         DEFAULTS.put(MEDIA_ENABLED, true);
-        DEFAULTS.put(MEDIA_SKIP, "chapter");
         DEFAULTS.put(RESUME_ENABLED, true);
         DEFAULTS.put(RESUME_MODE, "highlight");
         DEFAULTS.put(TAP_ENABLED, true);
-        DEFAULTS.put(TAP_GESTURE, "tap");
         DEFAULTS.put(TAP_RETURN_BUTTON, true);
         DEFAULTS.put(TAP_AUTO_RETURN, 0);
         DEFAULTS.put(TAP_CLOSED_BAR, "mark");
         DEFAULTS.put(TAP_CURRENT_LINE, "nothing");
         DEFAULTS.put(TAP_OTHER_LINE, "jump");
         DEFAULTS.put(TAP_FOLLOW_POSITION, "bottom");
-        DEFAULTS.put(PLAYER_ENABLED, true);
-        DEFAULTS.put(PLAYER_ON_LEAVE, "continue");
         DEFAULTS.put(GEAR_ENABLED, true);
         DEFAULTS.put(GEAR_SCREENS, "reader");
         DEFAULTS.put(TITLES_ENABLED, true);
@@ -289,7 +266,6 @@ public final class HtcSettings {
             json.put("applied.tap", HtcPatches.tapToSeek());
             json.put("applied.titles", HtcPatches.chapterTitles());
             json.put("applied.sync", HtcPatches.autoSync());
-            json.put("applied.player", HtcPatches.miniPlayer());
             json.put("patches.version", HtcPatches.version());
         } catch (Throwable ignored) {
         }
@@ -423,12 +399,6 @@ public final class HtcSettings {
             switch (cmd) {
                 case "open":
                     openSettings();
-                    break;
-                case "sleep":
-                    app.hoitruyenchu.extension.itruyenchu.patches.tts.SleepTimer.cycle();
-                    break;
-                case "sleepState":
-                    app.hoitruyenchu.extension.itruyenchu.patches.tts.SleepTimer.publish();
                     break;
                 default:
                     Log.w(TAG, "unknown command " + cmd);

@@ -50,7 +50,6 @@ import java.util.Set;
 import app.hoitruyenchu.extension.itruyenchu.patches.shared.HtcPatches;
 import app.hoitruyenchu.extension.itruyenchu.patches.shared.HtcSettings;
 import app.hoitruyenchu.extension.itruyenchu.patches.titles.ChapterTitlesPatch;
-import app.hoitruyenchu.extension.itruyenchu.patches.tts.SleepTimer;
 
 /**
  * The settings screen of the patches, opened from the account tab ("Cài đặt HoiTruyenChu").
@@ -158,7 +157,6 @@ public final class SettingsActivity extends Activity {
         if (HtcPatches.backgroundReading()) backgroundSection();
         if (HtcPatches.rememberSpeed()) speedSection();
         if (HtcPatches.mediaControls()) mediaSection();
-        if (HtcPatches.miniPlayer()) playerSection();
         if (HtcPatches.resumeListening()) resumeSection();
         if (HtcPatches.tapToSeek()) tapSection();
         if (HtcPatches.chapterTitles()) titlesSection();
@@ -178,12 +176,9 @@ public final class SettingsActivity extends Activity {
         choice(HtcSettings.TTS_CALL, "Khi có cuộc gọi", on,
                 new Object[]{"resume", "pause", "none"},
                 new String[]{"Tạm dừng, đọc tiếp sau cuộc gọi", "Chỉ tạm dừng", "Không làm gì"});
-        toggle(HtcSettings.TTS_NOISY, "Tạm dừng khi rút tai nghe", "Cả khi ngắt kết nối tai nghe Bluetooth", on);
         choice(HtcSettings.TTS_RETRIES, "Đọc lại dòng bị lỗi", on,
                 new Object[]{0, 1, 2, 3, 4, 5},
                 new String[]{"Không đọc lại", "1 lần", "2 lần", "3 lần", "4 lần", "5 lần"});
-        toggle(HtcSettings.TTS_APPLY_SPEED, "Áp dụng tốc độ mới ngay",
-                "Đổi tốc độ khi đang đọc thì đọc tiếp ngay với tốc độ mới", on);
         action("Bộ đọc (TTS engine)", engineLabel(), on, this::pickEngine);
         action("Giọng đọc", voiceLabel(), on, this::pickVoice);
         action("Nghe thử", "Đọc một câu mẫu với bộ đọc, giọng và tốc độ đang chọn", on, this::preview);
@@ -194,33 +189,23 @@ public final class SettingsActivity extends Activity {
         header("Nghe tiếp đúng chữ");
         String m = HtcSettings.WORD_ENABLED;
         toggle(m, "Nghe tiếp từ chữ đang đọc",
-                "Dừng rồi phát lại (nút dừng, thông báo, cuộc gọi, tai nghe, hẹn giờ, đổi tốc độ, mở lại truyện) thì đọc tiếp từ chữ đó, không đọc lại từ đầu dòng",
+                "Dừng rồi phát lại, sau cuộc gọi, khi đổi tốc độ hay mở lại truyện thì đọc tiếp từ chữ đó, không đọc lại từ đầu dòng",
                 true);
         boolean on = HtcSettings.bool(m);
         choice(HtcSettings.WORD_FROM, "Đọc tiếp từ", on,
                 new Object[]{"word", "back", "phrase", "seconds"},
                 new String[]{"Đúng chữ đang đọc", "Lùi 1–2 chữ", "Đầu cụm gần nhất (sau dấu phẩy, dấu chấm)", "Lùi khoảng 2 giây"});
         boolean reader = on && HtcPatches.tapToSeek();
-        choice(HtcSettings.WORD_KARAOKE, "Tô sáng theo chữ", reader,
-                new Object[]{"off", "bold", "dim", "underline"},
-                new String[]{"Không, chỉ tô dòng", "Tô đậm chữ đang đọc", "Làm mờ phần chưa đọc", "Gạch chân chữ đang đọc"});
         choice(HtcSettings.WORD_TAP, "Chạm vào chữ trong dòng", reader,
-                new Object[]{"line", "word", "hold"},
-                new String[]{"Đọc từ đầu dòng", "Đọc từ chữ được chạm (ước lượng, có thể lệch 1 chữ)",
-                        "Chạm: từ đầu dòng · nhấn giữ: từ chữ được chạm"});
+                new Object[]{"line", "word"},
+                new String[]{"Đọc từ đầu dòng", "Đọc từ chữ được chạm (ước lượng, có thể lệch 1 chữ)"});
         reset("word.", "Nghe tiếp đúng chữ");
     }
 
     private void backgroundSection() {
-        header("Đọc nền & hẹn giờ tắt");
+        header("Đọc nền");
         String m = HtcSettings.BG_ENABLED;
         toggle(m, "Đọc khi tắt màn hình", "Vẫn đọc tiếp và sang chương mới khi app chạy nền", true);
-        boolean on = HtcSettings.bool(m);
-        String state = SleepTimer.describe();
-        action("Hẹn giờ tắt", state != null ? SleepTimer.label(SleepTimer.option()) + " · " + state : "Tắt",
-                on, this::pickSleep);
-        toggle(HtcSettings.BG_SLEEP_BUTTON, "Nút hẹn giờ trên thanh đọc",
-                "Nút mặt trăng cạnh nút tốc độ: mỗi lần bấm chuyển sang mức hẹn giờ tiếp theo", on);
         reset("bg.", "Đọc nền");
     }
 
@@ -258,9 +243,6 @@ public final class SettingsActivity extends Activity {
         }
         toggle(HtcSettings.SPEED_SNAP, "Hút vào mốc khi kéo",
                 "Kéo gần 1.0x hoặc một nút chọn nhanh thì tự dính vào, rung nhẹ", on);
-        toggle(HtcSettings.SPEED_REMAINING, "Thời gian còn lại của chương",
-                "Dòng \"Còn ~6 phút ở 1.25x\" dưới số tốc độ (ước lượng)", on);
-        toggle(HtcSettings.SPEED_RESET_BUTTON, "Nút về 1.0x", "Cạnh số tốc độ trong menu", on);
         toggle(HtcSettings.SPEED_EXTRA_LEVELS, "Thêm nút chọn nhanh vào danh sách của app",
                 "Chỉ khi kiểu menu là \"Danh sách của app\"", on && "list".equals(HtcSettings.string(HtcSettings.SPEED_MENU)));
         reset("speed.", "Tốc độ đọc");
@@ -296,23 +278,7 @@ public final class SettingsActivity extends Activity {
         toggle(m, "Điều khiển việc đọc từ thông báo",
                 "Thông báo / màn hình khóa hiện việc đọc (dòng x/y), các nút điều khiển việc đọc. Cần khởi động lại app",
                 true, true);
-        boolean on = HtcSettings.bool(m);
-        choice(HtcSettings.MEDIA_SKIP, "Nút tới / lùi", on,
-                new Object[]{"chapter", "line1", "line5"},
-                new String[]{"Đổi chương", "Tới / lùi 1 dòng", "Tới / lùi 5 dòng"});
         reset("media.", "Điều khiển trên màn hình khóa");
-    }
-
-    private void playerSection() {
-        header("Thanh phát mini");
-        String m = HtcSettings.PLAYER_ENABLED;
-        toggle(m, "Vẫn nghe khi rời trình đọc",
-                "Thanh phát mini trên thanh tab: ảnh bìa, truyện, chương, các nút như thanh đọc. Chạm để mở lại đúng dòng",
-                true);
-        choice(HtcSettings.PLAYER_ON_LEAVE, "Khi rời trình đọc lúc đang nghe", HtcSettings.bool(m),
-                new Object[]{"continue", "pause", "ask", "stop"},
-                new String[]{"Đọc tiếp + thanh mini", "Dừng, vẫn hiện thanh mini", "Hỏi mỗi lần", "Dừng như cũ"});
-        reset("player.", "Thanh phát mini");
     }
 
     private void resumeSection() {
@@ -330,9 +296,6 @@ public final class SettingsActivity extends Activity {
         String m = HtcSettings.TAP_ENABLED;
         toggle(m, "Chạm vào dòng để nghe từ dòng đó", "Đọc theo chiều dọc", true);
         boolean on = HtcSettings.bool(m);
-        choice(HtcSettings.TAP_GESTURE, "Cử chỉ", on,
-                new Object[]{"tap", "double", "long"},
-                new String[]{"Chạm một lần", "Chạm hai lần", "Nhấn giữ"});
         toggle(HtcSettings.TAP_RETURN_BUTTON, "Nút \"Về dòng đang đọc\"",
                 "Hiện khi tự cuộn trang lúc đang nghe", on);
         choice(HtcSettings.TAP_AUTO_RETURN, "Tự quay về dòng đang đọc", on,
@@ -736,28 +699,7 @@ public final class SettingsActivity extends Activity {
     }
 
     // ---------------------------------------------------------------------------------------------
-    // Sleep timer, speed
-
-    private void pickSleep() {
-        final String[] options = SleepTimer.OPTIONS;
-        String[] labels = new String[options.length];
-        int selected = 0;
-        for (int i = 0; i < options.length; i++) {
-            labels[i] = i == 0 ? "Tắt" : options[i].startsWith("m") ? "Sau " + SleepTimer.label(options[i]) : SleepTimer.label(options[i]);
-            if (options[i].equals(SleepTimer.option())) selected = i;
-        }
-        new AlertDialog.Builder(this)
-                .setTitle("Hẹn giờ tắt")
-                .setSingleChoiceItems(labels, selected, (dialog, which) -> {
-                    dialog.dismiss();
-                    SleepTimer.set(options[which]);
-                    toast(which == 0 ? "Đã tắt hẹn giờ" : "Hẹn giờ tắt: " + SleepTimer.label(options[which])
-                            + " (dừng ở cuối dòng đang đọc)");
-                    render();
-                })
-                .setNegativeButton("Hủy", null)
-                .show();
-    }
+    // Speed
 
     private void pickSpeed() {
         float current = shownSpeed > 0 ? shownSpeed : HtcSettings.savedSpeed();

@@ -68,7 +68,6 @@
     }
 
     var lastPause = 0;
-    var sleep = { option: 'off', endAt: 0, chapters: 0 };
     var listeners = [];
     function notify() {
       var l = listeners.slice();
@@ -80,70 +79,13 @@
         if (c.cmd === 'pause') {
           if (c.id && c.id === lastPause) return;
           lastPause = c.id;
-          if (mounted > 0 && bar.playing && typeof bar.play === 'function') { log('pause (' + (c.sleep ? 'sleep timer' : 'system') + ')'); bar.play(); }
-        } else if (c.cmd === 'sleep') {
-          sleep = { option: c.option || 'off', endAt: c.endAt || 0, chapters: c.chapters || 0 };
-          notify();
+          if (mounted > 0 && bar.playing && typeof bar.play === 'function') { log('pause (system)'); bar.play(); }
         } else if (c.cmd === 'speed') {
           var v = Number(c.value);
           if (v >= 0.1 && v <= 4 && typeof V.getState().setSpeed === 'function') { V.getState().setSpeed(v); log('speed ' + v); }
         }
       } catch (e) { log('command failed ' + e); }
     });
-
-    // ---- Sleep timer button (background reading patch), next to the speed button
-    function sleepLabel() {
-      var o = sleep.option;
-      if (!o || o === 'off') return null;
-      if (o.charAt(0) === 'm') {
-        var left = Math.max(1, Math.ceil((sleep.endAt - Date.now()) / 60000));
-        return left + "'";
-      }
-      return Math.max(1, sleep.chapters) + ' ch';
-    }
-    function SleepButton(props) {
-      var st = React.useState(0);
-      var setTick = st[1];
-      React.useEffect(function () {
-        var fn = function () { setTick(function (n) { return n + 1; }); };
-        listeners.push(fn);
-        var timer = setInterval(fn, 30000);
-        return function () {
-          clearInterval(timer);
-          var i = listeners.indexOf(fn);
-          if (i >= 0) listeners.splice(i, 1);
-        };
-      }, []);
-      if (!S('applied.bg', false) || !S('bg.enabled', true) || !S('bg.sleepButton', true)) return null;
-      var ic = loadIcons();
-      var Icon = ic && (ic.Moon || ic.Timer || ic.AlarmClock || ic.Clock);
-      var label = sleepLabel();
-      var color = props.color || '#888888';
-      var active = label ? '#f5a524' : color;
-      var children = [];
-      if (Icon) children.push(jsx0(Icon, { size: label ? 16 : 18, color: active }, 'i'));
-      else children.push(jsx0(Text, { style: { color: active, fontSize: 14 }, children: 'Zz' }, 'i'));
-      if (label) children.push(jsx0(Text, { numberOfLines: 1, style: { color: active, fontSize: 10, fontWeight: '700', marginTop: 1 }, children: label }, 't'));
-      return jsxs0(Touch, {
-        onPress: function () { cmd('sleep'); },
-        hitSlop: 8,
-        accessibilityLabel: 'H\u1eb9n gi\u1edd t\u1eaft',
-        style: { alignItems: 'center', justifyContent: 'center', minWidth: 30, marginLeft: 6, paddingVertical: 2 },
-        children: children
-      });
-    }
-    g.__htcSleepButton = SleepButton;
-    // The speed button: TouchableOpacity > Text [speed.toFixed(..), 'x'].
-    function speedButtonColor(props) {
-      var t = props && props.children;
-      if (!t || t.type !== Text || !t.props) return null;
-      var c = t.props.children;
-      if (!c || typeof c.length !== 'number' || c[c.length - 1] !== 'x') return null;
-      var style = t.props.style;
-      var flat = null;
-      try { flat = RN.StyleSheet.flatten(style); } catch (e) {}
-      return (flat && flat.color) || '#888888';
-    }
 
     // ---- Entry points of the settings screen
     var ROW_LABEL = 'C\u00e0i \u0111\u1eb7t HoiTruyenChu';
@@ -335,7 +277,7 @@
       return out;
     }
 
-    // Returns {props, wrapColor} to change the element, or null.
+    // Returns {props} / {props, wrapRoot} to change the element, or null.
     function inspect(type, props) {
       if (type && typeof type === 'object' && type.type && typeof type.type === 'function'
           && type.type.name === 'VoiceBar' && !type.type.__htcCore) {
@@ -350,10 +292,7 @@
         if (ct && (ct === icons.Play || ct === icons.Pause) && typeof props.onPress === 'function') {
           bar.play = props.onPress;
           bar.playing = ct === icons.Pause;
-          return null;
         }
-        var color = speedButtonColor(props);
-        if (color) return { props: null, wrapColor: color };
         return null;
       }
       if ((type === View || type === RN.ScrollView) && props.children && typeof props.children.length === 'number') {
@@ -377,21 +316,13 @@
           } catch (e) { log('root layer failed ' + e); return nav; }
         }
         if (r.props) { args[1] = r.props; return jsxs0.apply(this, args); }
-        var el = orig.apply(this, args);
-        if (r.wrapColor) {
-          try {
-            return jsxs0(View, { style: { flexDirection: 'row', alignItems: 'center' },
-              children: [el, jsx0(SleepButton, { color: r.wrapColor }, 'htc-sleep')] });
-          } catch (e) { log('sleep button failed ' + e); }
-        }
-        return el;
+        return orig.apply(this, args);
       };
     }
     var jsx = wrapJsx(jsx0), jsxs = wrapJsx(jsxs0);
     JSX.jsx = jsx;
     JSX.jsxs = jsxs;
     if (JSX.jsx !== jsx) { log('jsx not writable'); return; }
-    cmd('sleepState');
     log('ready');
   } catch (e) {
     log('init failed ' + e);
