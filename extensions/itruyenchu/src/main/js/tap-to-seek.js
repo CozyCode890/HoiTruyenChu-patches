@@ -1,8 +1,7 @@
 // java: app/hoitruyenchu/extension/itruyenchu/patches/taptoseek/TapToSeekPatch.java
 (function () {
   var TAG = '[HTC-TapSeek] ';
-  function log(m) { try { var s0 = globalThis.__htcS; if (s0 && s0.debug === false) return; console.log(TAG + m); } catch (e) {} }
-  function S(k, d) { try { var s0 = globalThis.__htcS; var v = s0 ? s0[k] : undefined; return v === undefined || v === null ? d : v; } catch (e) { return d; } }
+  var log = globalThis.__htcLog(TAG), S = globalThis.__htcGet;
   try {
     var g = typeof globalThis !== 'undefined' ? globalThis : this;
     if (typeof g.__r !== 'function') { log('no __r'); return; }
@@ -57,7 +56,6 @@
     var lineTexts = [];       // text of the shown lines (app 3.0.0 Line components)
     var viewHeight = 0;       // height of the reader's ScrollView
     var contentTop = 0;       // y of ReadContent in the scrolled content
-    var contentHeight = 0;
     var scrollY = 0;          // its scroll position
     var detached = false;     // the user scrolled by hand: the reader does not follow the voice
     var listeners = [];
@@ -68,11 +66,13 @@
     var mapShown = null;
     var activeStyle = null;
 
-    function assign(src, extra) {
-      var out = {}, k;
-      for (k in src) out[k] = src[k];
-      for (k in extra) out[k] = extra[k];
-      return out;
+    // Calls fn (errors ignored), then the original handler.
+    function chain(orig, fn) {
+      return function () {
+        try { fn.apply(this, arguments); } catch (x) {}
+        if (typeof orig === 'function') return orig.apply(this, arguments);
+        return undefined;
+      };
     }
 
     function splitLines(t) {
@@ -427,10 +427,12 @@
         onPress: returnToLine,
         hitSlop: 8,
         accessibilityRole: 'button',
-        style: assign(BUTTON_STYLE, { bottom: (barHeight > 0 ? barHeight : 80) + 12 }),
+        style: Object.assign({}, BUTTON_STYLE, { bottom: (barHeight > 0 ? barHeight : 80) + 12 }),
         children: children
       });
     }
+
+    function resetTap() { pending = null; restarting = 0; queued = null; setDetached(false); }
 
     function onContent(props) {
       if (props.content !== shownText) {
@@ -439,10 +441,7 @@
         heights = [];
         textLayouts = [];
         lineTexts = [];
-        pending = null;
-        restarting = 0;
-        queued = null;
-        setDetached(false);
+        resetTap();
       }
       scrollRef = props.scrollRef || null;
       updateMap();
@@ -459,12 +458,9 @@
         // (title, buttons above it) is needed to place a line on the screen.
         try {
           if (el && el.props && typeof React.cloneElement === 'function') {
-            var prev = el.props.onLayout;
-            el = React.cloneElement(el, { onLayout: function (e) {
-              try { var y = e.nativeEvent.layout.y; if (typeof y === 'number') contentTop = y; } catch (x) {}
-              if (typeof prev === 'function') return prev.apply(this, arguments);
-              return undefined;
-            } });
+            el = React.cloneElement(el, { onLayout: chain(el.props.onLayout, function (e) {
+              var y = e.nativeEvent.layout.y; if (typeof y === 'number') contentTop = y;
+            }) });
           }
         } catch (e) { log('content layout failed ' + e); }
         return el;
@@ -531,22 +527,13 @@
         extra.onPress = function (e) { onLineShortPress(index, e); };
       }
       if (typeof props.children === 'string') lineTexts[index] = props.children;
-      var onLayout = props.onLayout;
-      if (typeof onLayout === 'function') {
-        extra.onLayout = function (e) {
-          try {
-            positions[index] = e.nativeEvent.layout.y;
-            heights[index] = e.nativeEvent.layout.height;
-          } catch (x) {}
-          return onLayout.apply(this, arguments);
-        };
+      if (typeof props.onLayout === 'function') {
+        extra.onLayout = chain(props.onLayout, function (e) {
+          positions[index] = e.nativeEvent.layout.y;
+          heights[index] = e.nativeEvent.layout.height;
+        });
       }
-      var onTextLayout = props.onTextLayout;
-      extra.onTextLayout = function (e) {
-        try { textLayouts[index] = e.nativeEvent.lines; } catch (x) {}
-        if (typeof onTextLayout === 'function') return onTextLayout.apply(this, arguments);
-        return undefined;
-      };
+      extra.onTextLayout = chain(props.onTextLayout, function (e) { textLayouts[index] = e.nativeEvent.lines; });
       if (map) {
         // The reader highlights the shown line with the number of the voice line: fix it.
         var style = props.style;
@@ -556,7 +543,7 @@
           if (!!style[1] !== on && (!on || activeStyle)) extra.style = [style[0], on ? activeStyle : false];
         }
       }
-      return assign(props, extra);
+      return Object.assign({}, props, extra);
     }
 
     function isReaderScroll(props) {
@@ -566,22 +553,6 @@
         if (c[i] && c[i].type === readContent) return true;
       }
       return false;
-    }
-
-    function dragHandler(orig) {
-      return function () {
-        try { cancelAutoReturn(); if (V.getState().isVoiceBarOpen) setDetached(true); } catch (e) {}
-        if (typeof orig === 'function') return orig.apply(this, arguments);
-        return undefined;
-      };
-    }
-
-    function dragEndHandler(orig) {
-      return function () {
-        try { scheduleAutoReturn(); } catch (e) {}
-        if (typeof orig === 'function') return orig.apply(this, arguments);
-        return undefined;
-      };
     }
 
     // Room after the last line, so that the line being read can go above the voice bar (or to the
@@ -595,33 +566,6 @@
         var base = flat && typeof flat.paddingBottom === 'number' ? flat.paddingBottom : 0;
         return [orig, { paddingBottom: base + extra }];
       } catch (e) { return orig; }
-    }
-
-    function viewLayoutHandler(orig) {
-      return function (e) {
-        try { var h = e.nativeEvent.layout.height; if (h > 0) viewHeight = h; } catch (x) {}
-        if (typeof orig === 'function') return orig.apply(this, arguments);
-        return undefined;
-      };
-    }
-
-    function scrollHandler(orig) {
-      return function (e) {
-        try { scrollY = e.nativeEvent.contentOffset.y; } catch (x) {}
-        if (typeof orig === 'function') return orig.apply(this, arguments);
-        return undefined;
-      };
-    }
-
-    function barLayoutHandler(orig) {
-      return function (e) {
-        try {
-          var h = e.nativeEvent.layout.height;
-          if (h > 0 && h !== barHeight) { barHeight = h; notify(); }
-        } catch (x) {}
-        if (typeof orig === 'function') return orig.apply(this, arguments);
-        return undefined;
-      };
     }
 
     // Returns {type, props, wrap} to change the element, or null to keep it.
@@ -656,11 +600,14 @@
       }
       if (type === ScrollView) {
         if (isReaderScroll(props)) {
-          return { type: type, props: assign(props, { onScrollBeginDrag: dragHandler(props.onScrollBeginDrag),
-            onScrollEndDrag: dragEndHandler(props.onScrollEndDrag),
-            onLayout: viewLayoutHandler(props.onLayout),
-            onScroll: scrollHandler(props.onScroll),
-            onContentSizeChange: (function (orig) { return function (w, h) { contentHeight = h; if (typeof orig === 'function') return orig.apply(this, arguments); return undefined; }; })(props.onContentSizeChange),
+          return { type: type, props: Object.assign({}, props, {
+            onScrollBeginDrag: chain(props.onScrollBeginDrag, function () {
+              cancelAutoReturn();
+              if (V.getState().isVoiceBarOpen) setDetached(true);
+            }),
+            onScrollEndDrag: chain(props.onScrollEndDrag, function () { scheduleAutoReturn(); }),
+            onLayout: chain(props.onLayout, function (e) { var h = e.nativeEvent.layout.height; if (h > 0) viewHeight = h; }),
+            onScroll: chain(props.onScroll, function (e) { scrollY = e.nativeEvent.contentOffset.y; }),
             contentContainerStyle: contentStyle(props.contentContainerStyle),
             scrollEventThrottle: props.scrollEventThrottle || 100 }), wrap: true };
         }
@@ -690,7 +637,10 @@
           // Root of the voice bar: style [barContainer, {transform: [{translateY}]}].
           var st = props.style;
           if (st && typeof st.length === 'number' && st.length === 2 && st[1] && st[1].transform) {
-            return { type: type, props: assign(props, { onLayout: barLayoutHandler(props.onLayout) }) };
+            return { type: type, props: Object.assign({}, props, { onLayout: chain(props.onLayout, function (e) {
+              var h = e.nativeEvent.layout.height;
+              if (h > 0 && h !== barHeight) { barHeight = h; notify(); }
+            }) }) };
           }
         }
       }
@@ -728,12 +678,7 @@
 
     V.subscribe(function (s, prev) {
       try {
-        if (prev && prev.isVoiceBarOpen && !s.isVoiceBarOpen) {
-          pending = null;
-          restarting = 0;
-          queued = null;
-          setDetached(false);
-        }
+        if (prev && prev.isVoiceBarOpen && !s.isVoiceBarOpen) resetTap();
       } catch (e) {}
     });
     log('ready');

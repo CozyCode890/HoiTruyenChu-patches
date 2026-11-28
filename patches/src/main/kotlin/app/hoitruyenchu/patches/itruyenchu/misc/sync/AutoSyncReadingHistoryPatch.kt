@@ -8,19 +8,15 @@ import app.hoitruyenchu.patches.itruyenchu.shared.Constants.EXTENSION_AUTO_SYNC
 import app.hoitruyenchu.patches.itruyenchu.shared.Constants.EXTENSION_SYNC_SCRIPT
 import app.hoitruyenchu.patches.itruyenchu.shared.ASYNC_STORAGE_MODULE
 import app.hoitruyenchu.patches.itruyenchu.shared.AsyncStorageConstructorFingerprint
-import app.hoitruyenchu.patches.itruyenchu.shared.AsyncStorageMultiGetFingerprint
 import app.hoitruyenchu.patches.itruyenchu.shared.AsyncStorageMultiSetFingerprint
-import app.hoitruyenchu.patches.itruyenchu.shared.CreateClientBuilderFingerprint
-import app.hoitruyenchu.patches.itruyenchu.shared.OKHTTP_CLIENT_BUILDER
-import app.hoitruyenchu.patches.itruyenchu.shared.ReactInstanceLoadJSBundleFingerprint
 import app.hoitruyenchu.patches.itruyenchu.shared.READABLE_ARRAY
-import app.morphe.patcher.extensions.InstructionExtensions.addInstruction
-import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
+import app.hoitruyenchu.patches.itruyenchu.shared.callAfterMainBundle
+import app.hoitruyenchu.patches.itruyenchu.shared.callBeforeStorageGet
+import app.hoitruyenchu.patches.itruyenchu.shared.callOnCreateClientBuilder
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.patch
 import com.android.tools.smali.dexlib2.Opcode
-import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 
 @Suppress("unused")
 val autoSyncReadingHistoryPatch = patch(
@@ -56,13 +52,7 @@ val autoSyncReadingHistoryPatch = patch(
 
         // 2. Before the reading history is loaded, let the startup sync merge the server history in.
         //    The wait runs on the module's serial executor, so the JS thread is never blocked.
-        AsyncStorageMultiGetFingerprint.method.addInstructions(
-            0,
-            """
-                iget-object v0, p0, $ASYNC_STORAGE_MODULE->executor:Lcom/reactnativecommunity/asyncstorage/SerialExecutor;
-                invoke-static { p1, v0 }, $EXTENSION_AUTO_SYNC->beforeStorageGet(${READABLE_ARRAY}Ljava/util/concurrent/Executor;)V
-            """,
-        )
+        callBeforeStorageGet(EXTENSION_AUTO_SYNC)
 
         // 3. Keep track of the login token.
         AsyncStorageMultiSetFingerprint.method.addInstructions(
@@ -71,30 +61,9 @@ val autoSyncReadingHistoryPatch = patch(
         )
 
         // 4. Free chapters (1-50) are downloaded without the token: record them on the server.
-        CreateClientBuilderFingerprint.method.apply {
-            val instructions = implementation!!.instructions.toList()
-            instructions.indices.reversed()
-                .filter { instructions[it].opcode == Opcode.RETURN_OBJECT }
-                .forEach { index ->
-                    val register = getInstruction<OneRegisterInstruction>(index).registerA
-                    addInstruction(
-                        index,
-                        "invoke-static { v$register }, $EXTENSION_AUTO_SYNC->onCreateClientBuilder($OKHTTP_CLIENT_BUILDER)V",
-                    )
-                }
-        }
+        callOnCreateClientBuilder(EXTENSION_AUTO_SYNC)
 
         // 5. JS script: sync right after logging in, and let the bookshelf button sync an empty bookshelf.
-        ReactInstanceLoadJSBundleFingerprint.method.apply {
-            val instructions = implementation!!.instructions.toList()
-            instructions.indices.reversed()
-                .filter { instructions[it].opcode == Opcode.RETURN_VOID }
-                .forEach { index ->
-                    addInstruction(
-                        index,
-                        "invoke-static { p0 }, $EXTENSION_SYNC_SCRIPT->afterMainBundle(Ljava/lang/Object;)V",
-                    )
-                }
-        }
+        callAfterMainBundle(EXTENSION_SYNC_SCRIPT)
     }
 }

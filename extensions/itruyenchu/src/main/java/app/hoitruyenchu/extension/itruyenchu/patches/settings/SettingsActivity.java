@@ -116,7 +116,6 @@ public final class SettingsActivity extends Activity {
         getWindow().getDecorView().setBackgroundColor(colorBackground);
 
         if (HtcPatches.ttsReliability()) startProbe(HtcSettings.string(HtcSettings.TTS_ENGINE));
-        render();
     }
 
     @Override
@@ -489,15 +488,11 @@ public final class SettingsActivity extends Activity {
         int index = 0;
         for (int i = 0; i < values.length; i++) if (values[i].equals(current)) index = i;
         final int selected = index;
-        row(title, labels[selected], enabled, () -> new AlertDialog.Builder(this)
-                .setTitle(title)
-                .setSingleChoiceItems(labels, selected, (dialog, which) -> {
-                    dialog.dismiss();
+        row(title, labels[selected], enabled,
+                () -> pick(title, labels, selected, which -> {
                     HtcSettings.put(key, values[which]);
                     render();
-                })
-                .setNegativeButton("Hủy", null)
-                .show(), null);
+                }), null);
     }
 
     private static Object valueOf(String key) {
@@ -636,20 +631,15 @@ public final class SettingsActivity extends Activity {
             labels.add(e.label);
         }
         int selected = Math.max(0, values.indexOf(HtcSettings.string(HtcSettings.TTS_ENGINE)));
-        new AlertDialog.Builder(this)
-                .setTitle("Bộ đọc (TTS engine)")
-                .setSingleChoiceItems(labels.toArray(new String[0]), selected, (dialog, which) -> {
-                    dialog.dismiss();
-                    String engine = values.get(which);
-                    if (engine.equals(HtcSettings.string(HtcSettings.TTS_ENGINE))) return;
-                    // The voices belong to the engine: back to automatic.
-                    HtcSettings.put(HtcSettings.TTS_VOICE, "");
-                    HtcSettings.put(HtcSettings.TTS_ENGINE, engine);
-                    startProbe(engine);
-                    render();
-                })
-                .setNegativeButton("Hủy", null)
-                .show();
+        pick("Bộ đọc (TTS engine)", labels.toArray(new String[0]), selected, which -> {
+            String engine = values.get(which);
+            if (engine.equals(HtcSettings.string(HtcSettings.TTS_ENGINE))) return;
+            // The voices belong to the engine: back to automatic.
+            HtcSettings.put(HtcSettings.TTS_VOICE, "");
+            HtcSettings.put(HtcSettings.TTS_ENGINE, engine);
+            startProbe(engine);
+            render();
+        });
     }
 
     private void pickVoice() {
@@ -668,13 +658,24 @@ public final class SettingsActivity extends Activity {
         }
         if (voices.isEmpty()) toast("Bộ đọc này không có giọng tiếng Việt");
         int selected = Math.max(0, values.indexOf(HtcSettings.string(HtcSettings.TTS_VOICE)));
+        pick("Giọng đọc", labels.toArray(new String[0]), selected, which -> {
+            HtcSettings.put(HtcSettings.TTS_VOICE, values.get(which));
+            render();
+            preview();
+        });
+    }
+
+    private interface IntConsumer {
+        void accept(int value);
+    }
+
+    /** Dialog with one choice per label: dismissed, then onPick gets the index. */
+    private void pick(String title, String[] labels, int selected, IntConsumer onPick) {
         new AlertDialog.Builder(this)
-                .setTitle("Giọng đọc")
-                .setSingleChoiceItems(labels.toArray(new String[0]), selected, (dialog, which) -> {
+                .setTitle(title)
+                .setSingleChoiceItems(labels, selected, (dialog, which) -> {
                     dialog.dismiss();
-                    HtcSettings.put(HtcSettings.TTS_VOICE, values.get(which));
-                    render();
-                    preview();
+                    onPick.accept(which);
                 })
                 .setNegativeButton("Hủy", null)
                 .show();
@@ -782,7 +783,6 @@ public final class SettingsActivity extends Activity {
             if (requestCode == REQUEST_EXPORT) {
                 JSONObject json = HtcSettings.toJson();
                 json.put("htcSettingsVersion", 1);
-                json.put("patchesVersion", HtcPatches.version());
                 try (OutputStream out = getContentResolver().openOutputStream(uri, "wt")) {
                     if (out == null) throw new Exception("no output");
                     out.write(json.toString(2).getBytes(StandardCharsets.UTF_8));

@@ -1,8 +1,7 @@
 // java: app/hoitruyenchu/extension/itruyenchu/patches/speed/RememberSpeedPatch.java
 (function () {
   var TAG = '[HTC-Speed] ';
-  function log(m) { try { var s0 = globalThis.__htcS; if (s0 && s0.debug === false) return; console.log(TAG + m); } catch (e) {} }
-  function S(k, d) { try { var s0 = globalThis.__htcS; var v = s0 ? s0[k] : undefined; return v === undefined || v === null ? d : v; } catch (e) { return d; } }
+  var log = globalThis.__htcLog(TAG), S = globalThis.__htcGet;
   try {
     var g = typeof globalThis !== 'undefined' ? globalThis : this;
     if (typeof g.__r !== 'function') { log('no __r'); return; }
@@ -132,7 +131,6 @@
       } catch (e) { return null; }
     }
 
-    var ACCENT = '#f0a93b';
     var PANEL = { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 14 };
     var BIG = { color: '#ffffff', fontSize: 30, fontWeight: '700', textAlign: 'center' };
     var SMALL = { color: 'rgba(255,255,255,0.6)', fontSize: 13, textAlign: 'center', marginTop: 2 };
@@ -204,20 +202,13 @@
         jsx0(View, { pointerEvents: 'none', style: { position: 'absolute', left: thumbLeft, width: 20, height: 20, borderRadius: 10, backgroundColor: '#ffffff' } }, 'k')
       ];
       var forceState = React.useState(0);
-      return jsxs0(View, assignAll(responder.panHandlers, {
+      return jsxs0(View, Object.assign({}, responder.panHandlers, {
         style: TRACK_BOX,
         onLayout: function (e) {
           try { var nw = e.nativeEvent.layout.width; if (nw > 0 && nw !== widthRef.current) { widthRef.current = nw; forceState[1](function (n) { return n + 1; }); } } catch (x) {}
         },
         children: children
       }));
-    }
-
-    function assignAll(a, b) {
-      var out = {}, k;
-      for (k in a) out[k] = a[k];
-      for (k in b) out[k] = b[k];
-      return out;
     }
 
     // Long press on - / + keeps stepping.
@@ -256,8 +247,7 @@
         valueRef.current = v;
         setValue(v);
       };
-      var header = [jsx0(Text, { style: BIG, children: value.toFixed(2) + 'x' }, 'big')];
-      var kids = [jsxs0(View, { children: header }, 'head')];
+      var kids = [jsx0(Text, { style: BIG, children: value.toFixed(2) + 'x' }, 'big')];
       // Time left in the chapter at this speed (estimate).
       var left = remaining(value);
       if (left) kids.push(jsx0(Text, { style: SMALL, children: left }, 'left'));
@@ -277,9 +267,9 @@
         for (var i = 0; i < marks.length; i++) {
           (function (v) {
             var on = Math.abs(v - value) < 0.001;
-            var inner = [jsx0(Text, { style: [CHIP_TEXT, on && CHIP_TEXT_ON], children: v === 1 ? '1.0' : String(v) }, 'v')];
             chipEls.push(jsxs0(View, { style: { alignItems: 'center' }, children: [
-              jsx0(Touch, { style: [CHIP, on && CHIP_ON], onPress: function () { commit(v); }, children: inner[0] }, 'c'),
+              jsx0(Touch, { style: [CHIP, on && CHIP_ON], onPress: function () { commit(v); },
+                children: jsx0(Text, { style: [CHIP_TEXT, on && CHIP_TEXT_ON], children: v === 1 ? '1.0' : String(v) }, 'v') }, 'c'),
               v === 1 ? jsx0(Text, { style: NORMAL, children: 'Bình thường' }, 'n') : jsx0(View, { style: { height: 17 } }, 'n')
             ] }, String(v)));
           })(marks[i]);

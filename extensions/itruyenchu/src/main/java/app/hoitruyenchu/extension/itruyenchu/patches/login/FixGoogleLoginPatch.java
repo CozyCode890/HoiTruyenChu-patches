@@ -108,12 +108,7 @@ public final class FixGoogleLoginPatch implements Interceptor {
             return original;
         }
 
-        String body;
-        try {
-            body = new JSONObject().put("idToken", token).toString();
-        } catch (Throwable t) {
-            return chain.proceed(request);
-        }
+        String body = "{\"idToken\":" + JSONObject.quote(token) + "}";
         MediaType json = MediaType.parse("application/json; charset=utf-8");
         Request fixed = request.newBuilder().post(RequestBody.create(json, body)).build();
         Response response = chain.proceed(fixed);

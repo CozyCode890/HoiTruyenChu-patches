@@ -5,9 +5,8 @@ import app.hoitruyenchu.patches.itruyenchu.misc.settings.settingsPatch
 import app.hoitruyenchu.patches.itruyenchu.audio.tts.ttsReliabilityPatch
 import app.hoitruyenchu.patches.itruyenchu.shared.Constants.COMPATIBILITY_ITRUYENCHU
 import app.hoitruyenchu.patches.itruyenchu.shared.Constants.EXTENSION_TTS_MEDIA_SESSION
-import app.hoitruyenchu.patches.itruyenchu.shared.CreateClientBuilderFingerprint
-import app.hoitruyenchu.patches.itruyenchu.shared.OKHTTP_CLIENT_BUILDER
-import app.hoitruyenchu.patches.itruyenchu.shared.ReactInstanceLoadJSBundleFingerprint
+import app.hoitruyenchu.patches.itruyenchu.shared.callAfterMainBundle
+import app.hoitruyenchu.patches.itruyenchu.shared.callOnCreateClientBuilder
 import app.morphe.patcher.extensions.InstructionExtensions.addInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
@@ -15,7 +14,6 @@ import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.patch
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
-import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 
@@ -82,31 +80,9 @@ val ttsMediaControlsPatch = patch(
         )
 
         // 3. The chapter texts are captured to know where the reading is in the chapter.
-        CreateClientBuilderFingerprint.method.apply {
-            val instructions = implementation!!.instructions.toList()
-            instructions.indices.reversed()
-                .filter { instructions[it].opcode == Opcode.RETURN_OBJECT }
-                .forEach { index ->
-                    val register = getInstruction<OneRegisterInstruction>(index).registerA
-                    addInstruction(
-                        index,
-                        "invoke-static { v$register }, $EXTENSION_TTS_MEDIA_SESSION->" +
-                                "onCreateClientBuilder($OKHTTP_CLIENT_BUILDER)V",
-                    )
-                }
-        }
+        callOnCreateClientBuilder(EXTENSION_TTS_MEDIA_SESSION)
 
         // 4. The buttons are carried out by the voice bar (JS script evaluated after the app bundle).
-        ReactInstanceLoadJSBundleFingerprint.method.apply {
-            val instructions = implementation!!.instructions.toList()
-            instructions.indices.reversed()
-                .filter { instructions[it].opcode == Opcode.RETURN_VOID }
-                .forEach { index ->
-                    addInstruction(
-                        index,
-                        "invoke-static { p0 }, $EXTENSION_TTS_MEDIA_SESSION->afterMainBundle(Ljava/lang/Object;)V",
-                    )
-                }
-        }
+        callAfterMainBundle(EXTENSION_TTS_MEDIA_SESSION)
     }
 }

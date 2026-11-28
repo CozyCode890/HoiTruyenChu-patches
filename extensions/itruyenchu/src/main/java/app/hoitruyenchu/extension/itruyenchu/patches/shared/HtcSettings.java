@@ -9,7 +9,6 @@ import android.database.sqlite.SQLiteDatabase;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
-import android.widget.Toast;
 
 import com.facebook.react.bridge.ReadableArray;
 
@@ -402,13 +401,8 @@ public final class HtcSettings {
     private static void runCommand(JSONObject command) {
         String cmd = command.optString("cmd");
         try {
-            switch (cmd) {
-                case "open":
-                    openSettings();
-                    break;
-                default:
-                    Log.w(TAG, "unknown command " + cmd);
-            }
+            if ("open".equals(cmd)) openSettings();
+            else Log.w(TAG, "unknown command " + cmd);
         } catch (Throwable t) {
             Log.w(TAG, "command " + cmd + " failed", t);
         }
@@ -426,16 +420,6 @@ public final class HtcSettings {
         context.startActivity(intent);
     }
 
-    public static void toast(final String text) {
-        main.post(() -> {
-            try {
-                Context context = context();
-                if (context != null) Toast.makeText(context, text, Toast.LENGTH_SHORT).show();
-            } catch (Throwable ignored) {
-            }
-        });
-    }
-
     @SuppressLint("PrivateApi")
     public static Context context() {
         try {
@@ -446,14 +430,19 @@ public final class HtcSettings {
         }
     }
 
-    /** Reads a key of the app's AsyncStorage (RKStorage / catalystLocalStorage). */
-    public static String readStorage(String key) {
+    /** The app's AsyncStorage database (RKStorage, table catalystLocalStorage), or null. */
+    private static SQLiteDatabase openStorage(int flags) {
         Context context = context();
         if (context == null) return null;
+        File file = context.getDatabasePath("RKStorage");
+        return file.exists() ? SQLiteDatabase.openDatabase(file.getPath(), null, flags) : null;
+    }
+
+    /** Reads a key of the app's AsyncStorage. @return its value, or null (missing, or failed: logged). */
+    public static String readStorage(String key) {
         try {
-            File file = context.getDatabasePath("RKStorage");
-            if (!file.exists()) return null;
-            SQLiteDatabase db = SQLiteDatabase.openDatabase(file.getPath(), null, SQLiteDatabase.OPEN_READONLY);
+            SQLiteDatabase db = openStorage(SQLiteDatabase.OPEN_READONLY);
+            if (db == null) return null;
             try (Cursor cursor = db.rawQuery("SELECT value FROM catalystLocalStorage WHERE key = ?", new String[]{key})) {
                 return cursor.moveToFirst() ? cursor.getString(0) : null;
             } finally {
@@ -462,6 +451,23 @@ public final class HtcSettings {
         } catch (Throwable t) {
             Log.w(TAG, "reading " + key + " failed: " + t);
             return null;
+        }
+    }
+
+    /** Writes a key of the app's AsyncStorage. @return false if it failed (logged). */
+    public static boolean writeStorage(String key, String value) {
+        try {
+            SQLiteDatabase db = openStorage(SQLiteDatabase.OPEN_READWRITE);
+            if (db == null) return false;
+            try {
+                db.execSQL("INSERT OR REPLACE INTO catalystLocalStorage (key, value) VALUES (?, ?)", new Object[]{key, value});
+                return true;
+            } finally {
+                db.close();
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "writing " + key + " failed: " + t);
+            return false;
         }
     }
 }

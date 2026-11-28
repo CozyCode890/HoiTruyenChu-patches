@@ -6,14 +6,12 @@ import app.hoitruyenchu.patches.itruyenchu.shared.Constants.EXTENSION_PATCH_FLAG
 import app.hoitruyenchu.patches.itruyenchu.shared.Constants.EXTENSION_SETTINGS
 import app.hoitruyenchu.patches.itruyenchu.shared.Constants.SETTINGS_ACTIVITY
 import app.hoitruyenchu.patches.itruyenchu.shared.READABLE_ARRAY
-import app.hoitruyenchu.patches.itruyenchu.shared.ReactInstanceLoadJSBundleFingerprint
-import app.morphe.patcher.extensions.InstructionExtensions.addInstruction
+import app.hoitruyenchu.patches.itruyenchu.shared.callAfterMainBundle
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.patch.document
 import app.morphe.patcher.patch.mutableClassDefBy
 import app.morphe.patcher.patch.patch
 import app.morphe.patcher.util.returnEarly
-import com.android.tools.smali.dexlib2.Opcode
 
 /** Version of the patches (gradle.properties), written into the jar by the build. */
 private val PATCHES_VERSION: String = try {
@@ -71,16 +69,6 @@ val settingsPatch = patch(
         )
 
         // Settings script: entry in the account tab, settings for the other scripts.
-        ReactInstanceLoadJSBundleFingerprint.method.apply {
-            val instructions = implementation!!.instructions.toList()
-            instructions.indices.reversed()
-                .filter { instructions[it].opcode == Opcode.RETURN_VOID }
-                .forEach { index ->
-                    addInstruction(
-                        index,
-                        "invoke-static { p0 }, $EXTENSION_SETTINGS->afterMainBundle(Ljava/lang/Object;)V",
-                    )
-                }
-        }
+        callAfterMainBundle(EXTENSION_SETTINGS)
     }
 }

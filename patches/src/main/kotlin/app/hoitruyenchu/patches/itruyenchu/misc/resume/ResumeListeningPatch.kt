@@ -5,10 +5,8 @@ import app.hoitruyenchu.patches.itruyenchu.misc.settings.settingsPatch
 import app.hoitruyenchu.patches.itruyenchu.audio.tts.ttsReliabilityPatch
 import app.hoitruyenchu.patches.itruyenchu.shared.Constants.COMPATIBILITY_ITRUYENCHU
 import app.hoitruyenchu.patches.itruyenchu.shared.Constants.EXTENSION_RESUME_LISTENING
-import app.hoitruyenchu.patches.itruyenchu.shared.ReactInstanceLoadJSBundleFingerprint
-import app.morphe.patcher.extensions.InstructionExtensions.addInstruction
+import app.hoitruyenchu.patches.itruyenchu.shared.callAfterMainBundle
 import app.morphe.patcher.patch.patch
-import com.android.tools.smali.dexlib2.Opcode
 
 @Suppress("unused")
 val resumeListeningPatch = patch(
@@ -26,16 +24,6 @@ val resumeListeningPatch = patch(
     execute {
         enablePatchFlag("resumeListening")
 
-        ReactInstanceLoadJSBundleFingerprint.method.apply {
-            val instructions = implementation!!.instructions.toList()
-            instructions.indices.reversed()
-                .filter { instructions[it].opcode == Opcode.RETURN_VOID }
-                .forEach { index ->
-                    addInstruction(
-                        index,
-                        "invoke-static { p0 }, $EXTENSION_RESUME_LISTENING->afterMainBundle(Ljava/lang/Object;)V",
-                    )
-                }
-        }
+        callAfterMainBundle(EXTENSION_RESUME_LISTENING)
     }
 }

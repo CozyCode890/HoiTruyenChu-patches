@@ -2,8 +2,7 @@
 (function () {
   var TAG = '[HTC-Resume] ';
   var KEY = 'htc_listen_pos';
-  function log(m) { try { var s0 = globalThis.__htcS; if (s0 && s0.debug === false) return; console.log(TAG + m); } catch (e) {} }
-  function S(k, d) { try { var s0 = globalThis.__htcS; var v = s0 ? s0[k] : undefined; return v === undefined || v === null ? d : v; } catch (e) { return d; } }
+  var log = globalThis.__htcLog(TAG), S = globalThis.__htcGet;
   try {
     var g = typeof globalThis !== 'undefined' ? globalThis : this;
     if (typeof g.__r !== 'function') { log('no __r'); return; }

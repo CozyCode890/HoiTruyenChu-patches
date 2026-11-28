@@ -1,8 +1,7 @@
 // java: app/hoitruyenchu/extension/itruyenchu/patches/shared/SettingsScript.java
 (function () {
   var TAG = '[HTC-Settings] ';
-  function log(m) { try { var s0 = globalThis.__htcS; if (s0 && s0.debug === false) return; console.log(TAG + m); } catch (e) {} }
-  function S(k, d) { try { var s0 = globalThis.__htcS; var v = s0 ? s0[k] : undefined; return v === undefined || v === null ? d : v; } catch (e) { return d; } }
+  var log = globalThis.__htcLog(TAG), S = globalThis.__htcGet;
   try {
     var g = typeof globalThis !== 'undefined' ? globalThis : this;
     if (typeof g.__r !== 'function') { log('no __r'); return; }
@@ -31,12 +30,9 @@
       } catch (e) { log('command failed ' + e); }
     }
     g.__htcCmd = cmd;
-    if (!g.__htcSL) g.__htcSL = [];
     RN.DeviceEventEmitter.addListener('htcSettingsChanged', function (json) {
       try {
         g.__htcS = JSON.parse(String(json));
-        var l = g.__htcSL.slice();
-        for (var i = 0; i < l.length; i++) { try { l[i](g.__htcS); } catch (e) {} }
         notify();
         log('settings updated');
       } catch (e) { log('bad settings ' + e); }
@@ -67,7 +63,6 @@
       log('voice bar hooked');
     }
 
-    var lastPause = 0;
     var listeners = [];
     function notify() {
       var l = listeners.slice();
@@ -77,8 +72,6 @@
       try {
         var c = JSON.parse(String(json));
         if (c.cmd === 'pause') {
-          if (c.id && c.id === lastPause) return;
-          lastPause = c.id;
           if (mounted > 0 && bar.playing && typeof bar.play === 'function') { log('pause (system)'); bar.play(); }
         } else if (c.cmd === 'speed') {
           var v = Number(c.value);
@@ -131,14 +124,9 @@
       return out;
     }
 
-    // ---- Screen shown (navigation state) and the layer above the whole app (floating settings
-    // button, mini player of other scripts: g.__htcOverlays = [component, ...]).
-    var route = { name: '', path: [], params: null };
+    // ---- Screen shown (navigation state) and the floating settings button above the whole app.
+    var route = { name: '', path: [] };
     var navRef = null;
-    if (!g.__htcOverlays) g.__htcOverlays = [];
-    g.__htcRoute = function () { return route; };
-    g.__htcNav = function () { return navRef && navRef.current ? navRef.current : null; };
-    g.__htcNotify = function () { notify(); };
     function focusedPath(state) {
       var names = [];
       for (var i = 0; state && state.routes && i < 10; i++) {
@@ -155,11 +143,7 @@
         if (!path.length) return;
         var name = path[path.length - 1];
         if (name !== route.name) log('screen ' + path.join(' / '));
-        route = { name: name, path: path, params: null };
-        try {
-          var cur = navRef && navRef.current && navRef.current.getCurrentRoute ? navRef.current.getCurrentRoute() : null;
-          if (cur) route.params = cur.params || null;
-        } catch (e) {}
+        route = { name: name, path: path };
         notify();
       } catch (e) { log('route failed ' + e); }
     }
@@ -182,7 +166,7 @@
         if (typeof prevReady === 'function') return prevReady.apply(this, arguments);
         return undefined;
       };
-      return assign(props, extra);
+      return Object.assign({}, props, extra);
     }
 
     // Which screens show the settings button (setting gear.screens): "reader", "tabs" (the main
@@ -261,22 +245,6 @@
       });
     }
 
-    function RootLayer() {
-      useTick();
-      var kids = [];
-      var list = g.__htcOverlays || [];
-      for (var i = 0; i < list.length; i++) if (typeof list[i] === 'function') kids.push(jsx0(list[i], {}, 'o' + i));
-      kids.push(jsx0(Gear, {}, 'gear'));
-      return jsxs0(View, { pointerEvents: 'box-none', style: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }, children: kids });
-    }
-
-    function assign(src, extra) {
-      var out = {}, k;
-      for (k in src) out[k] = src[k];
-      for (k in extra) out[k] = extra[k];
-      return out;
-    }
-
     // Returns {props} / {props, wrapRoot} to change the element, or null.
     function inspect(type, props) {
       if (type && typeof type === 'object' && type.type && typeof type.type === 'function'
@@ -297,7 +265,7 @@
       }
       if ((type === View || type === RN.ScrollView) && props.children && typeof props.children.length === 'number') {
         var list = accountChildren(props.children) || loginChildren(props.children);
-        if (list) return { props: assign(props, { children: list }) };
+        if (list) return { props: Object.assign({}, props, { children: list }) };
       }
       return null;
     }
@@ -312,7 +280,7 @@
           args[1] = r.props;
           var nav = orig.apply(this, args);
           try {
-            return jsxs0(View, { style: { flex: 1 }, children: [nav, jsx0(RootLayer, {}, 'htc-root')] });
+            return jsxs0(View, { style: { flex: 1 }, children: [nav, jsx0(Gear, {}, 'htc-root')] });
           } catch (e) { log('root layer failed ' + e); return nav; }
         }
         if (r.props) { args[1] = r.props; return jsxs0.apply(this, args); }

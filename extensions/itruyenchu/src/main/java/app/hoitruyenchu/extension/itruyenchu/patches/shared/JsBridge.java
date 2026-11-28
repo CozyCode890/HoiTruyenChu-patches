@@ -35,13 +35,6 @@ public final class JsBridge {
         }
     }
 
-    /** @return the React context of the running app, or null. */
-    public static Object context() {
-        synchronized (lock) {
-            return reactContext != null ? reactContext.get() : null;
-        }
-    }
-
     /** @return true if the event was handed to the app (not that a script received it). */
     public static boolean emit(String event, String data) {
         Object context;

@@ -1,8 +1,6 @@
 package app.hoitruyenchu.extension.itruyenchu.patches.sync;
 
 import android.content.Context;
-import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -13,9 +11,7 @@ import com.facebook.react.bridge.ReadableArray;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.File;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
@@ -32,9 +28,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.zip.GZIPInputStream;
 
 import app.hoitruyenchu.extension.itruyenchu.patches.shared.AppInfo;
+import app.hoitruyenchu.extension.itruyenchu.patches.shared.Gzip;
 import app.hoitruyenchu.extension.itruyenchu.patches.shared.HtcSettings;
 import okhttp3.OkHttpClient;
 
@@ -72,10 +68,8 @@ public final class AutoSyncPatch {
 
     // API host: AppInfo.apiUrl() (3.0.0 moved it from api.tienphu.top to api.hoitruyenchu.org).
     /** Returns the progress recorded by the server as {slug: chapter}. */
-    private static final String PULL_PATH = "/users/sync-books-new";
+    static final String PULL_PATH = "/users/sync-books-new";
 
-    /** Public files (book info). The app's STATIC_URL first, the website's as fallback. */
-    private static final String[] STATIC_URLS = {"https://assets.tienphu.top", "https://assets.hoitruyenchu.org"};
     private static final int BOOK_INFO_TIMEOUT_MS = 2_000;
     private static final long BOOK_INFO_BUDGET_MS = 2_500;
 
@@ -83,8 +77,6 @@ public final class AutoSyncPatch {
     private static final String KEY_AUTH = "auth-storage";
     /** Books deleted from the history on this device, {slug: chapter when deleted} (written by SyncScript). */
     private static final String KEY_DELETED = "htc_sync_deleted";
-    private static final String DATABASE = "RKStorage";
-    private static final String TABLE = "catalystLocalStorage";
 
     /** Same limit as the app (addRecentRead keeps 20 entries). */
     private static final int MAX_ITEMS = 20;
@@ -96,7 +88,8 @@ public final class AutoSyncPatch {
     private static final long PUSH_BUDGET_MS = 8_000;
 
     private static final Object lock = new Object();
-    private static Context appContext;
+    /** The startup sync was started (once per process). */
+    private static boolean started;
     private static Handler worker;
 
     /** Login token persisted by the app. */
@@ -118,9 +111,8 @@ public final class AutoSyncPatch {
     /** End of the AsyncStorageModule constructor. */
     public static void onStorageCreated(Context context) {
         synchronized (lock) {
-            if (appContext != null || context == null) return;
-            Context app = context.getApplicationContext();
-            appContext = app != null ? app : context;
+            if (started || context == null) return;
+            started = true;
             workerLocked().post(AutoSyncPatch::startupSync);
         }
     }
@@ -147,7 +139,7 @@ public final class AutoSyncPatch {
                         merged = startupMerged;
                         startupMerged = null;
                     }
-                    if (merged != null && writeDb(KEY_READ, merged)) {
+                    if (merged != null && HtcSettings.writeStorage(KEY_READ, merged)) {
                         Log.i(TAG, "merged server history into the local history");
                     }
                 } catch (Throwable t) {
@@ -305,12 +297,12 @@ public final class AutoSyncPatch {
     /** Runs on the worker thread, before the app loads its history. */
     private static void startupSync() {
         try {
-            token = tokenFrom(readDb(KEY_AUTH));
+            token = tokenFrom(HtcSettings.readStorage(KEY_AUTH));
             if (!HtcSettings.on(HtcSettings.SYNC_ENABLED, HtcSettings.SYNC_ON_START)) {
                 Log.i(TAG, "sync at app start turned off in the settings");
                 return;
             }
-            String stored = readDb(KEY_READ);
+            String stored = HtcSettings.readStorage(KEY_READ);
             JSONArray local = recentReadsFrom(stored);
             JSONArray remote = null;
             if (token == null) {
@@ -350,7 +342,7 @@ public final class AutoSyncPatch {
     static JSONArray withoutDeleted(JSONArray remote) {
         JSONObject deleted = null;
         try {
-            String value = readDb(KEY_DELETED);
+            String value = HtcSettings.readStorage(KEY_DELETED);
             if (value != null && !value.trim().isEmpty()) deleted = new JSONObject(value);
         } catch (Throwable t) {
             Log.w(TAG, "could not read the deleted books", t);
@@ -446,10 +438,8 @@ public final class AutoSyncPatch {
 
     /** Title missing, or totalChapter missing / not above the current chapter (shows 100 %). */
     private static boolean needsBookInfo(JSONObject item) {
-        if (isEmpty(item.opt("title")) || isEmpty(item.opt("totalChapter"))) return true;
-        Object total = item.opt("totalChapter");
-        double totalChapters = total instanceof Number ? ((Number) total).doubleValue() : parseDouble(total);
-        return totalChapters <= chapterOf(item);
+        return isEmpty(item.opt("title")) || isEmpty(item.opt("totalChapter"))
+                || number(item.opt("totalChapter")) <= chapterOf(item);
     }
 
     private static int fillBookInfo(List<JSONObject> missing) {
@@ -518,7 +508,9 @@ public final class AutoSyncPatch {
         return chapter == Math.rint(chapter) ? String.valueOf((long) chapter) : String.valueOf(chapter);
     }
 
-    private static double parseDouble(Object value) {
+    /** 92 for 92, 92.0 or "92"; 0 if missing or not a number. */
+    private static double number(Object value) {
+        if (value instanceof Number) return ((Number) value).doubleValue();
         try {
             return value == null ? 0 : Double.parseDouble(value.toString());
         } catch (NumberFormatException e) {
@@ -596,13 +588,7 @@ public final class AutoSyncPatch {
     }
 
     private static double chapterOf(JSONObject item) {
-        Object value = item.opt("currentChapter");
-        if (value instanceof Number) return ((Number) value).doubleValue();
-        try {
-            return value == null ? 0 : Double.parseDouble(value.toString());
-        } catch (NumberFormatException e) {
-            return 0;
-        }
+        return number(item.opt("currentChapter"));
     }
 
     private static boolean isEmpty(Object value) {
@@ -727,7 +713,7 @@ public final class AutoSyncPatch {
 
     /** GET of a public JSON file (optionally gzipped). @return the JSON, or null. */
     private static JSONObject getPublicJson(String path, String what) {
-        for (String host : STATIC_URLS) {
+        for (String host : AppInfo.STATIC_URLS) {
             ByteArrayOutputStream response = new ByteArrayOutputStream();
             int code = request("GET", host + path, null, null, BOOK_INFO_TIMEOUT_MS, response);
             if (code < 200 || code >= 300) {
@@ -736,15 +722,7 @@ public final class AutoSyncPatch {
             }
             try {
                 byte[] bytes = response.toByteArray();
-                if (bytes.length > 2 && (bytes[0] & 0xff) == 0x1f && (bytes[1] & 0xff) == 0x8b) {
-                    ByteArrayOutputStream unzipped = new ByteArrayOutputStream();
-                    try (InputStream in = new GZIPInputStream(new ByteArrayInputStream(bytes))) {
-                        byte[] buffer = new byte[8192];
-                        int n;
-                        while ((n = in.read(buffer)) > 0) unzipped.write(buffer, 0, n);
-                    }
-                    bytes = unzipped.toByteArray();
-                }
+                if (Gzip.isGzip(bytes)) bytes = Gzip.gunzip(bytes, false);
                 return new JSONObject(new String(bytes, StandardCharsets.UTF_8));
             } catch (Throwable t) {
                 Log.w(TAG, what + ": unexpected answer");
@@ -753,45 +731,4 @@ public final class AutoSyncPatch {
         return null;
     }
 
-    // ---------------------------------------------------------------------------------------------
-    // AsyncStorage database (RKStorage / catalystLocalStorage)
-
-    private static SQLiteDatabase openDb() {
-        Context context = appContext;
-        if (context == null) return null;
-        File file = context.getDatabasePath(DATABASE);
-        if (!file.exists()) return null;
-        return SQLiteDatabase.openDatabase(file.getPath(), null, SQLiteDatabase.OPEN_READWRITE);
-    }
-
-    private static String readDb(String key) {
-        try {
-            SQLiteDatabase db = openDb();
-            if (db == null) return null;
-            try (Cursor cursor = db.rawQuery("SELECT value FROM " + TABLE + " WHERE key = ?", new String[]{key})) {
-                return cursor.moveToFirst() ? cursor.getString(0) : null;
-            } finally {
-                db.close();
-            }
-        } catch (Throwable t) {
-            Log.w(TAG, "reading " + key + " failed: " + t);
-            return null;
-        }
-    }
-
-    private static boolean writeDb(String key, String value) {
-        try {
-            SQLiteDatabase db = openDb();
-            if (db == null) return false;
-            try {
-                db.execSQL("INSERT OR REPLACE INTO " + TABLE + " (key, value) VALUES (?, ?)", new Object[]{key, value});
-                return true;
-            } finally {
-                db.close();
-            }
-        } catch (Throwable t) {
-            Log.w(TAG, "writing " + key + " failed: " + t);
-            return false;
-        }
-    }
 }

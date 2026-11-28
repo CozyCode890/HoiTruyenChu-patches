@@ -22,6 +22,8 @@ public final class AppInfo {
 
     private static final String API_V2 = "https://api.tienphu.top";
     private static final String API_V3 = "https://api.hoitruyenchu.org";
+    /** Public files (book info, chapter lists, previews): the app's STATIC_URL first, the website's as fallback. */
+    public static final String[] STATIC_URLS = {"https://assets.tienphu.top", "https://assets.hoitruyenchu.org"};
 
     /** jsx react/jsx-runtime, rn react-native, icons lucide-react-native, toast react-native-toast-message,
      *  auth useAuthStore, api the app's axios client, read useReadStore, replace useMagicReplaceStore +

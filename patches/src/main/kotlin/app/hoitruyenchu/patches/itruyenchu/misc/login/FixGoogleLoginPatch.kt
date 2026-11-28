@@ -5,13 +5,8 @@ import app.hoitruyenchu.patches.itruyenchu.misc.settings.settingsPatch
 import app.hoitruyenchu.patches.itruyenchu.misc.extension.sharedExtensionPatch
 import app.hoitruyenchu.patches.itruyenchu.shared.Constants.COMPATIBILITY_ITRUYENCHU
 import app.hoitruyenchu.patches.itruyenchu.shared.Constants.EXTENSION_FIX_GOOGLE_LOGIN
-import app.hoitruyenchu.patches.itruyenchu.shared.CreateClientBuilderFingerprint
-import app.hoitruyenchu.patches.itruyenchu.shared.OKHTTP_CLIENT_BUILDER
-import app.morphe.patcher.extensions.InstructionExtensions.addInstruction
-import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
+import app.hoitruyenchu.patches.itruyenchu.shared.callOnCreateClientBuilder
 import app.morphe.patcher.patch.patch
-import com.android.tools.smali.dexlib2.Opcode
-import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 
 @Suppress("unused")
 val fixGoogleLoginPatch = patch(
@@ -27,19 +22,6 @@ val fixGoogleLoginPatch = patch(
     execute {
         enablePatchFlag("googleLogin")
 
-        CreateClientBuilderFingerprint.method.apply {
-            val instructions = implementation!!.instructions.toList()
-            // Every return of the builder gets the interceptor.
-            instructions.indices.reversed()
-                .filter { instructions[it].opcode == Opcode.RETURN_OBJECT }
-                .forEach { index ->
-                    val register = getInstruction<OneRegisterInstruction>(index).registerA
-                    addInstruction(
-                        index,
-                        "invoke-static { v$register }, $EXTENSION_FIX_GOOGLE_LOGIN->" +
-                                "onCreateClientBuilder($OKHTTP_CLIENT_BUILDER)V",
-                    )
-                }
-        }
+        callOnCreateClientBuilder(EXTENSION_FIX_GOOGLE_LOGIN)
     }
 }

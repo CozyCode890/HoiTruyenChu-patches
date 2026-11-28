@@ -5,10 +5,8 @@ import app.hoitruyenchu.patches.itruyenchu.misc.settings.settingsPatch
 import app.hoitruyenchu.patches.itruyenchu.misc.extension.sharedExtensionPatch
 import app.hoitruyenchu.patches.itruyenchu.shared.Constants.COMPATIBILITY_ITRUYENCHU
 import app.hoitruyenchu.patches.itruyenchu.shared.Constants.EXTENSION_REMEMBER_SPEED
-import app.hoitruyenchu.patches.itruyenchu.shared.ReactInstanceLoadJSBundleFingerprint
-import app.morphe.patcher.extensions.InstructionExtensions.addInstruction
+import app.hoitruyenchu.patches.itruyenchu.shared.callAfterMainBundle
 import app.morphe.patcher.patch.patch
-import com.android.tools.smali.dexlib2.Opcode
 
 @Suppress("unused")
 val rememberSpeedPatch = patch(
@@ -26,16 +24,6 @@ val rememberSpeedPatch = patch(
         enablePatchFlag("rememberSpeed")
 
         // JS script evaluated after the app bundle.
-        ReactInstanceLoadJSBundleFingerprint.method.apply {
-            val instructions = implementation!!.instructions.toList()
-            instructions.indices.reversed()
-                .filter { instructions[it].opcode == Opcode.RETURN_VOID }
-                .forEach { index ->
-                    addInstruction(
-                        index,
-                        "invoke-static { p0 }, $EXTENSION_REMEMBER_SPEED->afterMainBundle(Ljava/lang/Object;)V",
-                    )
-                }
-        }
+        callAfterMainBundle(EXTENSION_REMEMBER_SPEED)
     }
 }

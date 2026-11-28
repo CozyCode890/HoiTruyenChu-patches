@@ -1,9 +1,6 @@
 package app.hoitruyenchu.extension.itruyenchu.patches.titles;
 
-import android.annotation.SuppressLint;
 import android.content.Context;
-import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
 import android.net.ConnectivityManager;
 import android.net.Uri;
 import android.util.Log;
@@ -13,9 +10,7 @@ import com.facebook.react.bridge.ReadableArray;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -40,10 +35,10 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 import app.hoitruyenchu.extension.itruyenchu.patches.shared.AppInfo;
+import app.hoitruyenchu.extension.itruyenchu.patches.shared.Gzip;
 import app.hoitruyenchu.extension.itruyenchu.patches.shared.HtcSettings;
 import app.hoitruyenchu.extension.itruyenchu.patches.shared.JsBridge;
 import app.hoitruyenchu.extension.itruyenchu.patches.shared.JsScripts;
@@ -71,13 +66,10 @@ import okhttp3.OkHttpClient;
 public final class ChapterTitlesPatch {
     static final String TAG = "HTC-Titles";
 
-    private static final String[] STATIC_URLS = {"https://assets.tienphu.top", "https://assets.hoitruyenchu.org"};
     /** Chapters 1-50 are free (same limit as the app's getChapterContent). */
     private static final int FREE_CHAPTERS = 50;
 
     private static final String CACHE_DIR = "htc-chapter-titles";
-    private static final String DATABASE = "RKStorage";
-    private static final String TABLE = "catalystLocalStorage";
     private static final String KEY_READ = "read";
 
     /** How long the app's chapter list request may wait for missing titles. */
@@ -159,8 +151,8 @@ public final class ChapterTitlesPatch {
      */
     static byte[] onChapterList(String slug, byte[] raw) throws Exception {
         if (!enabled()) return null;
-        boolean gzip = isGzip(raw);
-        JSONObject list = new JSONObject(new String(gzip ? gunzip(raw, false) : raw, StandardCharsets.UTF_8));
+        boolean gzip = Gzip.isGzip(raw);
+        JSONObject list = new JSONObject(new String(gzip ? Gzip.gunzip(raw, false) : raw, StandardCharsets.UTF_8));
         Book book = book(slug);
         List<String> missing = networkAllowed() ? book.missing(list) : new ArrayList<>();
         if (!missing.isEmpty()) {
@@ -200,7 +192,7 @@ public final class ChapterTitlesPatch {
     /** Puts the known titles into the app's stored copy {"timestamp":..,"data":{chapter list}}. */
     private static void updateStoredList(String key, String slug) {
         try {
-            String value = readDb(key);
+            String value = HtcSettings.readStorage(key);
             if (value == null) return;
             JSONObject stored = new JSONObject(value);
             JSONObject list = stored.optJSONObject("data");
@@ -208,7 +200,7 @@ public final class ChapterTitlesPatch {
             Book book = book(slug);
             List<String> missing = networkAllowed() ? book.missing(list) : new ArrayList<>();
             if (!missing.isEmpty()) fetch(book, missing); // background, ready next time
-            if (book.apply(list) > 0 && writeDb(key, stored.toString())) {
+            if (book.apply(list) > 0 && HtcSettings.writeStorage(key, stored.toString())) {
                 Log.i(TAG, slug + ": real titles written into the stored chapter list");
             }
         } catch (Throwable t) {
@@ -228,7 +220,7 @@ public final class ChapterTitlesPatch {
     private static boolean networkAllowed() {
         if (!HtcSettings.bool(HtcSettings.TITLES_WIFI_ONLY)) return true;
         try {
-            Context context = context();
+            Context context = HtcSettings.context();
             ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
             return cm != null && !cm.isActiveNetworkMetered();
         } catch (Throwable t) {
@@ -236,17 +228,9 @@ public final class ChapterTitlesPatch {
         }
     }
 
-    /**
-     * The title put into the list: only the name, the app itself shows "Chương 12: " in front of it.
-     * (A list with "Chương 12: Tên" in it, from a test build, is turned back into the name.)
-     */
-    private static String display(String key, String title) {
-        return title;
-    }
-
     /** Size in bytes of the title cache. */
     public static long cacheSize() {
-        Context context = context();
+        Context context = HtcSettings.context();
         if (context == null) return 0;
         File[] files = new File(context.getFilesDir(), CACHE_DIR).listFiles();
         long size = 0;
@@ -256,7 +240,7 @@ public final class ChapterTitlesPatch {
 
     /** Deletes the title cache. @return number of books removed. */
     public static int clearCache() {
-        Context context = context();
+        Context context = HtcSettings.context();
         int count = 0;
         synchronized (books) {
             books.clear();
@@ -268,7 +252,7 @@ public final class ChapterTitlesPatch {
         return count;
     }
 
-    /** Title shown by the app for a chapter, or null if it is only the chapter number. */
+    /** The app's title of a chapter only repeats its number ("Chương 12"), or is missing. */
     private static boolean isGeneric(Object title) {
         return !(title instanceof String) || GENERIC_TITLE.matcher((String) title).matches();
     }
@@ -311,8 +295,8 @@ public final class ChapterTitlesPatch {
         }
 
         /**
-         * Replaces generic titles with the known ones (also titles put earlier in the other display
-         * format). @return number of chapters with a real title.
+         * Replaces generic titles with the known ones (also "Chương 12: Tên" put by a test build).
+         * @return number of chapters with a real title.
          */
         synchronized int apply(JSONObject list) throws Exception {
             int count = 0;
@@ -322,10 +306,9 @@ public final class ChapterTitlesPatch {
                 JSONObject chapter = list.optJSONObject(key);
                 if (title == null || chapter == null) continue;
                 Object current = chapter.opt("title");
-                String shown = display(key, title);
                 boolean ours = title.equals(current) || ("Chương " + key + ": " + title).equals(current);
                 if (!isGeneric(current) && !ours) continue;
-                if (!shown.equals(current)) chapter.put("title", shown);
+                if (!title.equals(current)) chapter.put("title", title);
                 count++;
             }
             return count;
@@ -387,7 +370,7 @@ public final class ChapterTitlesPatch {
         synchronized (books) {
             Book book = books.get(slug);
             if (book == null) {
-                Context context = context();
+                Context context = HtcSettings.context();
                 File dir = new File(context != null ? context.getFilesDir() : new File("/data/local/tmp"), CACHE_DIR);
                 book = new Book(slug, new File(dir, slug.replaceAll("[^A-Za-z0-9._-]", "_") + ".json"));
                 book.load();
@@ -471,12 +454,12 @@ public final class ChapterTitlesPatch {
                 ? "/free/" + Uri.encode(slug) + "/chuong-" + key + ".txt"
                 : "/preview/" + Uri.encode(slug) + "/chuong-" + key + "-preview.txt";
         Exception error = null;
-        for (String host : STATIC_URLS) {
+        for (String host : AppInfo.STATIC_URLS) {
             try {
                 byte[] bytes = getStart(host + path);
                 if (bytes == null) return null; // no such file
-                if (!isGzip(bytes)) throw new Exception("not gzip");
-                return titleFrom(new String(gunzip(bytes, true), StandardCharsets.UTF_8), key);
+                if (!Gzip.isGzip(bytes)) throw new Exception("not gzip");
+                return titleFrom(new String(Gzip.gunzip(bytes, true), StandardCharsets.UTF_8), key);
             } catch (Exception e) {
                 error = e;
             }
@@ -543,23 +526,6 @@ public final class ChapterTitlesPatch {
         return out.toByteArray();
     }
 
-    static boolean isGzip(byte[] bytes) {
-        return bytes != null && bytes.length > 2 && (bytes[0] & 0xff) == 0x1f && (bytes[1] & 0xff) == 0x8b;
-    }
-
-    /** @param partial the data is cut off: return what could be decompressed. */
-    private static byte[] gunzip(byte[] bytes, boolean partial) throws Exception {
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        try (InputStream in = new GZIPInputStream(new ByteArrayInputStream(bytes))) {
-            byte[] buffer = new byte[8192];
-            int n;
-            while ((n = in.read(buffer)) > 0) out.write(buffer, 0, n);
-        } catch (EOFException e) {
-            if (!partial) throw e;
-        }
-        return out.toByteArray();
-    }
-
     private static byte[] gzip(byte[] bytes) throws Exception {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (GZIPOutputStream zip = new GZIPOutputStream(out)) {
@@ -571,7 +537,7 @@ public final class ChapterTitlesPatch {
     /** Chapter being read in this book, from the app's reading history (key "read"), or 0. */
     private static double readingChapter(String slug) {
         try {
-            String value = readDb(KEY_READ);
+            String value = HtcSettings.readStorage(KEY_READ);
             if (value == null) return 0;
             JSONObject state = new JSONObject(value).optJSONObject("state");
             JSONArray items = state == null ? null : state.optJSONArray("recentReads");
@@ -587,52 +553,4 @@ public final class ChapterTitlesPatch {
         return 0;
     }
 
-    @SuppressLint("PrivateApi")
-    private static Context context() {
-        try {
-            return (Context) Class.forName("android.app.ActivityThread")
-                    .getMethod("currentApplication").invoke(null);
-        } catch (Throwable t) {
-            return null;
-        }
-    }
-
-    private static SQLiteDatabase openDb() {
-        Context context = context();
-        if (context == null) return null;
-        File file = context.getDatabasePath(DATABASE);
-        if (!file.exists()) return null;
-        return SQLiteDatabase.openDatabase(file.getPath(), null, SQLiteDatabase.OPEN_READWRITE);
-    }
-
-    private static String readDb(String key) {
-        try {
-            SQLiteDatabase db = openDb();
-            if (db == null) return null;
-            try (Cursor cursor = db.rawQuery("SELECT value FROM " + TABLE + " WHERE key = ?", new String[]{key})) {
-                return cursor.moveToFirst() ? cursor.getString(0) : null;
-            } finally {
-                db.close();
-            }
-        } catch (Throwable t) {
-            Log.w(TAG, "reading " + key + " failed: " + t);
-            return null;
-        }
-    }
-
-    private static boolean writeDb(String key, String value) {
-        try {
-            SQLiteDatabase db = openDb();
-            if (db == null) return false;
-            try {
-                db.execSQL("INSERT OR REPLACE INTO " + TABLE + " (key, value) VALUES (?, ?)", new Object[]{key, value});
-                return true;
-            } finally {
-                db.close();
-            }
-        } catch (Throwable t) {
-            Log.w(TAG, "writing " + key + " failed: " + t);
-            return false;
-        }
-    }
 }

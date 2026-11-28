@@ -1,11 +1,7 @@
 package app.hoitruyenchu.extension.itruyenchu.patches.tts;
 
-import android.content.BroadcastReceiver;
 import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
 import android.media.AudioManager;
-import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.PowerManager;
@@ -23,7 +19,6 @@ import java.lang.ref.WeakReference;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -126,10 +121,6 @@ public final class TtsController {
 
     /** Utterances requested by JS that have not finished yet, in request order. */
     private static final LinkedHashMap<String, Utterance> pending = new LinkedHashMap<>();
-    /** Utterances stopped by us (call interruption) whose onStop must not reach JS. */
-    private static final Set<String> suppressStop = new HashSet<>();
-    /** Utterances stopped by us after a speed change and already sent again: drop the old one's onStop/onError. */
-    private static final Set<String> respoken = new HashSet<>();
 
     // Engine settings already applied to the current engine instance.
     private static Float appliedPitch;
@@ -453,21 +444,24 @@ public final class TtsController {
         return Math.max(0, p);
     }
 
+    /** Speech rate of the current engine (1 before one is set). */
+    private static float rateLocked() {
+        return appliedRate != null ? appliedRate : 1f;
+    }
+
     /** Index in u.text the engine has reached. */
     private static int progressOfLocked(Utterance u) {
         if (!u.sent) return u.parkedAt >= 0 ? u.parkedAt : u.offset;
         if (u.progress >= 0) return u.progress;
         if (u.prepared != null && u.piece >= 0 && u.piece < u.prepared.pieces.size() && u.pieceStartedAt > 0) {
             int[] map = u.prepared.starts.get(u.piece);
-            float r = appliedRate != null ? appliedRate : 1f;
-            int chars = Math.round((SystemClock.elapsedRealtime() - u.pieceStartedAt) / 1000f * charsPerSecond * r);
+            int chars = Math.round((SystemClock.elapsedRealtime() - u.pieceStartedAt) / 1000f * charsPerSecond * rateLocked());
             return map.length == 0 ? u.offset : map[Math.max(0, Math.min(map.length - 1, chars - 2))];
         }
         if (u.startedAt <= 0) return u.offset;
         // No word events from this engine: estimate from the time spoken.
-        float rate = appliedRate != null ? appliedRate : 1f;
         long ms = SystemClock.elapsedRealtime() - u.startedAt;
-        int chars = Math.round(ms / 1000f * charsPerSecond * rate);
+        int chars = Math.round(ms / 1000f * charsPerSecond * rateLocked());
         return Math.min(u.text.length(), u.offset + Math.max(0, chars - 2));
     }
 
@@ -481,13 +475,33 @@ public final class TtsController {
         } else {
             int at = progressOfLocked(u);
             u.parkedAt = at;
-            u.offset = resumeFrom(u.text, at, appliedRate != null ? appliedRate : 1f, exactWord);
+            u.offset = resumeFrom(u.text, at, rateLocked(), exactWord);
         }
         u.progress = -1;
         u.startedAt = 0;
         u.piece = -1;
         // The parts already queued belong to the stopped send: their callbacks are ignored.
         u.sendSerial++;
+    }
+
+    /** Parks every line sent to the engine (the stopped parts are ignored: older send); true if there was one. */
+    private static boolean parkSentLocked(boolean exactWord) {
+        boolean any = false;
+        for (Utterance u : pending.values()) {
+            if (u.sent) {
+                parkLocked(u, exactWord);
+                any = true;
+            }
+            u.sent = false;
+        }
+        return any;
+    }
+
+    private static void stopEngineLocked() {
+        try {
+            if (tts != null) tts.stop();
+        } catch (Throwable ignored) {
+        }
     }
 
     /** Reading speed measured on finished lines, for the time left shown by the speed menu. */
@@ -515,11 +529,6 @@ public final class TtsController {
         return enabled() ? HtcSettings.string(HtcSettings.TTS_CALL) : "none";
     }
 
-    /** A new speed is used at once (the line goes on from its word at the new speed). */
-    private static boolean applySpeedNow() {
-        return enabled();
-    }
-
     private static String chosenEngine() {
         return enabled() ? HtcSettings.string(HtcSettings.TTS_ENGINE) : "";
     }
@@ -539,10 +548,6 @@ public final class TtsController {
                 }
             }
         });
-    }
-
-    static boolean isEndOfChapter(String text) {
-        return END_OF_CHAPTER.equals(text);
     }
 
     /** "Chương 12: Tên chương", the first line of a chapter text. */
@@ -619,8 +624,6 @@ public final class TtsController {
                 Log.i(TAG, "new reading while paused from the media controls, dropping " + pending.size() + " kept line(s)");
                 userPaused = false;
                 pending.clear();
-                suppressStop.clear();
-                respoken.clear();
             }
             Utterance u = new Utterance(id, text, language, pitch, rate, voice);
             u.offset = startOffsetLocked(text, continuous);
@@ -655,7 +658,7 @@ public final class TtsController {
         if (chained || !wordEnabled()) return 0;
         long[] point = pointsLocked().get(key);
         if (point == null) return 0;
-        int from = resumeFrom(text, (int) point[0], appliedRate != null ? appliedRate : 1f, false);
+        int from = resumeFrom(text, (int) point[0], rateLocked(), false);
         if (from > 0) Log.i(TAG, "going on from character " + from + " of the line (stopped at " + point[0] + ")");
         return from;
     }
@@ -675,8 +678,6 @@ public final class TtsController {
                 }
             }
             pending.clear();
-            suppressStop.clear();
-            respoken.clear();
             interrupted = false;
             userPaused = false;
             normalModeTicks = 0;
@@ -727,21 +728,11 @@ public final class TtsController {
             chosenRate = rate;
             if (previous == null || previous == rate) return;
             Log.i(TAG, "speed changed to " + rate);
-            if (!applySpeedNow()) return; // used from the next play, like the original app
+            if (!enabled()) return; // used from the next play, like the original app
             if (tts == null || !ready || blockedLocked()) return;
             // Speak the current line again at the new speed (the engine cannot change it mid-line).
-            boolean restart = false;
-            for (Utterance u : pending.values()) {
-                if (!u.sent) continue;
-                parkLocked(u, true); // the stopped parts are ignored (older send)
-                u.sent = false;
-                restart = true;
-            }
-            if (!restart) return;
-            try {
-                tts.stop();
-            } catch (Throwable ignored) {
-            }
+            if (!parkSentLocked(true)) return;
+            stopEngineLocked();
             flushLocked();
         }
     }
@@ -790,8 +781,6 @@ public final class TtsController {
                 initializing = false;
             }
             pending.clear();
-            suppressStop.clear();
-            respoken.clear();
             interrupted = false;
             userPaused = false;
         }
@@ -885,12 +874,7 @@ public final class TtsController {
         appliedLocale = null;
         appliedVoice = null;
         resolvedLocales.clear();
-        for (Utterance u : pending.values()) {
-            if (u.sent) parkLocked(u, true);
-            u.sent = false;
-        }
-        suppressStop.clear();
-        respoken.clear();
+        parkSentLocked(true);
 
         if (old != null) {
             try {
@@ -1010,7 +994,7 @@ public final class TtsController {
             tts.setPitch(u.pitch);
             appliedPitch = u.pitch;
         }
-        Float rate = chosenRate != null && applySpeedNow() ? chosenRate : u.rate;
+        Float rate = chosenRate != null && enabled() ? chosenRate : u.rate;
         if (rate != null && !rate.equals(appliedRate)) {
             tts.setSpeechRate(rate);
             appliedRate = rate;
@@ -1134,8 +1118,6 @@ public final class TtsController {
                 base = r.base;
                 Utterance u = pending.remove(base);
                 text = u != null ? u.text : null;
-                suppressStop.remove(base);
-                respoken.remove(base);
                 touchLocked();
                 lastDoneAt = SystemClock.elapsedRealtime();
                 if (u != null) {
@@ -1143,7 +1125,7 @@ public final class TtsController {
                     dropPointLocked(u.text);
                     int chars = u.text.length() - u.offset;
                     long ms = u.startedAt > 0 ? lastDoneAt - u.startedAt : 0;
-                    float rate = appliedRate != null ? appliedRate : 1f;
+                    float rate = rateLocked();
                     if (chars >= 20 && ms >= 1_000 && rate > 0) {
                         float cps = chars / (ms / 1000f) / rate;
                         if (cps > 3 && cps < 60) charsPerSecond = charsPerSecond * 0.8f + cps * 0.2f;
@@ -1167,10 +1149,7 @@ public final class TtsController {
                 PartRef r = resolveLocked(id);
                 base = r.base;
                 if (r.u != null && !r.current) return; // an older send, stopped by us
-                if (r.u != null) {
-                    if (respoken.remove(base) || suppressStop.remove(base)) return;
-                    pending.remove(base);
-                }
+                if (r.u != null) pending.remove(base);
                 // One onStop per line for the app (every queued part of a stopped line gets one).
                 if (base == null || stopForwarded.containsKey(base)) return;
                 stopForwarded.put(base, Boolean.TRUE);
@@ -1230,10 +1209,9 @@ public final class TtsController {
                 return;
             }
             id = r.base;
-            if (respoken.remove(id)) return;
             Utterance u = pending.get(id);
             if (u != null) {
-                if (blockedLocked() || suppressStop.remove(id)) {
+                if (blockedLocked()) {
                     // Caused by our own call interruption, it will be spoken again.
                     u.sent = false;
                     return;
@@ -1291,14 +1269,8 @@ public final class TtsController {
             if (userPaused || pending.isEmpty()) return;
             Log.i(TAG, "paused from the media controls");
             userPaused = true;
-            for (Utterance u : pending.values()) {
-                if (u.sent) parkLocked(u, false); // the stopped parts are ignored (older send)
-                u.sent = false;
-            }
-            try {
-                if (tts != null) tts.stop();
-            } catch (Throwable ignored) {
-            }
+            parkSentLocked(false);
+            stopEngineLocked();
         }
         ReadingProgress.onLineInterrupted();
         notifyMedia();
@@ -1332,10 +1304,7 @@ public final class TtsController {
     }
 
     private static void notifyMedia() {
-        try {
-            app.hoitruyenchu.extension.itruyenchu.patches.media.TtsMediaSession.notifyChanged(0);
-        } catch (Throwable ignored) {
-        }
+        notifyMediaLater(0);
     }
 
     private static void notifyMediaLater(long delayMs) {
@@ -1408,14 +1377,8 @@ public final class TtsController {
             if (!interrupted && !pending.isEmpty()) {
                 Log.i(TAG, "call detected (audio mode " + mode + "), pausing speech");
                 interrupted = true;
-                for (Utterance u : pending.values()) {
-                    if (u.sent) parkLocked(u, false); // the stopped parts are ignored (older send)
-                    u.sent = false;
-                }
-                try {
-                    if (tts != null) tts.stop();
-                } catch (Throwable ignored) {
-                }
+                parkSentLocked(false);
+                stopEngineLocked();
                 ReadingProgress.onLineInterrupted();
                 notifyMedia();
             }

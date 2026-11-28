@@ -244,12 +244,6 @@ final class SpeechText {
     private static void appendIfSpeakable(PieceBuilder buf, List<String> pieces, List<int[]> starts) {
         int trimStart = 0;
         int trimEnd = buf.size;
-        while (trimStart < trimEnd && isSpace(buf.chars[trimStart])) {
-            trimStart++;
-        }
-        while (trimEnd > trimStart && isSpace(buf.chars[trimEnd - 1])) {
-            trimEnd--;
-        }
 
         boolean hasContent = false;
         for (int k = trimStart; k < trimEnd; k++) {
@@ -378,7 +372,7 @@ final class SpeechText {
     }
 
     private static boolean isSpace(char c) {
-        return c == ' ' || c == '\t' || c == '\u00A0' || Character.isWhitespace(c);
+        return c == '\u00A0' || Character.isWhitespace(c);
     }
 
     /** Growable parallel arrays of characters and their original string indices. */

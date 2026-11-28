@@ -1,8 +1,7 @@
 // java: app/hoitruyenchu/extension/itruyenchu/patches/media/VoiceBarScript.java
 (function () {
   var TAG = '[HTC-VoiceBar] ';
-  function log(m) { try { var s0 = globalThis.__htcS; if (s0 && s0.debug === false) return; console.log(TAG + m); } catch (e) {} }
-  function S(k, d) { try { var s0 = globalThis.__htcS; var v = s0 ? s0[k] : undefined; return v === undefined || v === null ? d : v; } catch (e) { return d; } }
+  var log = globalThis.__htcLog(TAG), S = globalThis.__htcGet;
   try {
     var g = typeof globalThis !== 'undefined' ? globalThis : this;
     if (typeof g.__r !== 'function') { log('no __r'); return; }
@@ -81,13 +80,6 @@
       log('voice bar hooked' + (icons ? '' : ' (no icons)'));
     }
 
-    function assign(src, extra) {
-      var out = {}, k;
-      for (k in src) out[k] = src[k];
-      for (k in extra) out[k] = extra[k];
-      return out;
-    }
-
     // Returns new props for the element, or null to keep them.
     function inspect(type, props) {
       if (type && typeof type === 'object' && type.type && typeof type.type === 'function'
@@ -104,7 +96,7 @@
         var ct = child && typeof child === 'object' ? child.type : null;
         if (ct) {
           if (ct === icons.SkipBack) {
-            if (typeof props.onPress !== 'function' && S('media.enabled', true)) return assign(props, { onPress: onPrevPressed });
+            if (typeof props.onPress !== 'function' && S('media.enabled', true)) return Object.assign({}, props, { onPress: onPrevPressed });
           } else if (ct === icons.SkipForward) {
             if (typeof props.onPress === 'function') bar.next = props.onPress;
           } else if (ct === icons.Play || ct === icons.Pause) {

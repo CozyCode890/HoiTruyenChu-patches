@@ -2,8 +2,7 @@
 (function () {
   var TAG = '[HTC-Sync] ';
   var EMPTY = 'Kh\u00f4ng c\u00f3 truy\u1ec7n \u0111\u1ec3 \u0111\u1ed3ng b\u1ed9';
-  function log(m) { try { var s0 = globalThis.__htcS; if (s0 && s0.debug === false) return; console.log(TAG + m); } catch (e) {} }
-  function S(k, d) { try { var s0 = globalThis.__htcS; var v = s0 ? s0[k] : undefined; return v === undefined || v === null ? d : v; } catch (e) { return d; } }
+  var log = globalThis.__htcLog(TAG), S = globalThis.__htcGet;
   function esDefault(m) { return m && m.__esModule ? m['default'] : m; }
   try {
     var g = typeof globalThis !== 'undefined' ? globalThis : this;
@@ -41,44 +40,37 @@
       } catch (e) {}
     }
     function slugOf(arg) { return typeof arg === 'string' ? arg : (arg && typeof arg.slug === 'string' ? arg.slug : null); }
-    function wrapRemove(fn) {
+    // fn wrapped so that before(arg) runs first (errors logged); marked so it is wrapped only once.
+    function hook(fn, before) {
       if (typeof fn !== 'function' || fn.__htcSync) return fn;
       var w = function (arg) {
-        try {
-          var slug = slugOf(arg);
-          if (slug) {
-            var list = R.getState().recentReads || [], chapter = 0;
-            for (var i = 0; i < list.length; i++) if (list[i] && list[i].slug === slug) chapter = Number(list[i].currentChapter) || 0;
-            deleted[slug] = chapter;
-            saveDeleted();
-            log('deleted ' + slug + ' at chapter ' + chapter + ': not pulled back from the server');
-          }
-        } catch (e) { log('delete failed ' + e); }
+        try { before(arg); } catch (e) { log('history hook failed ' + e); }
         return fn.apply(this, arguments);
       };
       w.__htcSync = true;
       return w;
     }
-    function wrapAdd(fn) {
-      if (typeof fn !== 'function' || fn.__htcSync) return fn;
-      var w = function (entry) {
-        try {
-          var slug = slugOf(entry);
-          if (!restoring && slug && slug in deleted) {
-            delete deleted[slug];
-            saveDeleted();
-            log('read again: ' + slug + ' synced again');
-          }
-        } catch (e) {}
-        return fn.apply(this, arguments);
-      };
-      w.__htcSync = true;
-      return w;
+    function onRemove(arg) {
+      var slug = slugOf(arg);
+      if (!slug) return;
+      var list = R.getState().recentReads || [], chapter = 0;
+      for (var i = 0; i < list.length; i++) if (list[i] && list[i].slug === slug) chapter = Number(list[i].currentChapter) || 0;
+      deleted[slug] = chapter;
+      saveDeleted();
+      log('deleted ' + slug + ' at chapter ' + chapter + ': not pulled back from the server');
+    }
+    function onAdd(entry) {
+      var slug = slugOf(entry);
+      if (!restoring && slug && slug in deleted) {
+        delete deleted[slug];
+        saveDeleted();
+        log('read again: ' + slug + ' synced again');
+      }
     }
     function wrapStore(st) {
       var patch = {}, any = false;
-      if (typeof st.removeRecentRead === 'function' && !st.removeRecentRead.__htcSync) { patch.removeRecentRead = wrapRemove(st.removeRecentRead); any = true; }
-      if (typeof st.addRecentRead === 'function' && !st.addRecentRead.__htcSync) { patch.addRecentRead = wrapAdd(st.addRecentRead); any = true; }
+      if (typeof st.removeRecentRead === 'function' && !st.removeRecentRead.__htcSync) { patch.removeRecentRead = hook(st.removeRecentRead, onRemove); any = true; }
+      if (typeof st.addRecentRead === 'function' && !st.addRecentRead.__htcSync) { patch.addRecentRead = hook(st.addRecentRead, onAdd); any = true; }
       if (any) R.setState(patch);
     }
     try {

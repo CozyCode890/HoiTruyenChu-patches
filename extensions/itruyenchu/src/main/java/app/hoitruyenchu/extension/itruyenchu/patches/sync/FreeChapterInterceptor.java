@@ -35,7 +35,6 @@ final class FreeChapterInterceptor implements Interceptor {
     private static final String TAG = "HTC-Sync";
     private static final Pattern FREE_CHAPTER = Pattern.compile("^/free/([^/]+)/chuong-(\\d+)\\.txt$");
     private static final String SYNC_BUTTON_PATH = "/users/sync-books";
-    private static final String PULL_PATH = "/users/sync-books-new";
     /** Field of the request body: "newest" or "oldest" first, the order wanted for the answer. */
     static final String ORDER_FIELD = "htcOrder";
 
@@ -78,7 +77,7 @@ final class FreeChapterInterceptor implements Interceptor {
             int index = url.indexOf(SYNC_BUTTON_PATH);
             if (index < 0) return null;
             pull = request.newBuilder()
-                    .url(url.substring(0, index) + PULL_PATH + url.substring(index + SYNC_BUTTON_PATH.length()))
+                    .url(url.substring(0, index) + AutoSyncPatch.PULL_PATH + url.substring(index + SYNC_BUTTON_PATH.length()))
                     .post(RequestBody.create(json, "{}"))
                     .build();
         } catch (Throwable t) {
