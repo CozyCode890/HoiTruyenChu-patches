@@ -23,7 +23,7 @@ Click the button below, or manually add this repo url to Morphe Manager: https:/
 ## 🩹 Patches list
 
 <!-- PATCHES_START EXPANDED -->
-> **[v2.2.3](https://github.com/CozyCode890/HoiTruyenChu-patches/releases/tag/v2.2.3)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;9 patches total
+> **[v2.2.4](https://github.com/CozyCode890/HoiTruyenChu-patches/releases/tag/v2.2.4)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;9 patches total
 <details open>
 <summary>📦 iTruyenChu&nbsp;&nbsp;•&nbsp;&nbsp;9 patches</summary>
 <br>
@@ -37,15 +37,15 @@ Click the button below, or manually add this repo url to Morphe Manager: https:/
 
 | 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
 |----------|----------------|-----------|
-| [Auto sync reading history](#auto-sync-reading-history) | Syncs the reading history with the iTruyenChu account without pressing the sync button: free chapters 1-50, which the server never sees, are recorded too, and the progress from other devices is merged in (with book titles) when the app starts and right after logging in. The "Đồng bộ" button also works when the bookshelf is empty. |  |
-| [Background reading](#background-reading) | Keeps reading with the screen off: React Native pauses JS timers when the app goes to the background, which stops the app from starting the next chapter. JS timers keep running while a reading session is active. |  |
-| [Fix Google login](#fix-google-login) | Fixes "Đăng nhập với Google" failing with error 400: the server now expects the Firebase ID token (like the website) instead of the email sent by this app version. |  |
-| [Remember listening speed](#remember-listening-speed) | Keeps the speed chosen in the voice bar after the app is restarted (the app saved it under a misspelled key and always started at 1x). One speed for all books. The speed menu becomes a YouTube-like panel (big speed, - slider +, quick choices) with a settable range and step. |  |
-| [Resume listening position](#resume-listening-position) | Opening a book from the bookshelf or "Đọc truyện" goes back to the line where the listening stopped: the voice bar opens with the play button and the line is highlighted, pressing play continues from there. |  |
-| [Show chapter titles](#show-chapter-titles) | Shows the real chapter titles instead of "Vô Đề Mục" in the chapter list, the reader and the TTS: books whose chapter list only has "Chương N" get the title from the first line of the chapter text (public preview, no login needed), cached on the device. |  |
-| [TTS media controls](#tts-media-controls) | The media widget / lock screen shows the TTS reading instead of the silent 6 s file of the voice bar: playing or paused, the position in the chapter (line x/y). Its play / pause and next / previous buttons work like the voice bar's buttons (next / previous chapter), and the previous chapter button of the voice bar, which did nothing, opens the previous chapter. |  |
-| [TTS reliability](#tts-reliability) | Fixes text-to-speech reading that stops after a phone call or does nothing when pressing play: re-creates the TTS engine when it dies, pauses during calls and resumes afterwards, retries failed lines, uses the correct Vietnamese voice, and applies a new speed right away instead of after pause + play. A stopped line goes on from the word it was stopped at (pause, lock screen, call, speed change, reopening the book), not from its start. "~" and "..." are read naturally ("1~2" = "1 đến 2", a short pause after "...", quotes around "..." are not read). |  |
-| [Tap a line to listen from it](#tap-a-line-to-listen-from-it) | Tapping a line of the chapter (vertical reading) moves the voice reading there: while reading it continues from that line, while stopped the line is highlighted and play starts from it, with the voice bar closed the bar opens and the line is highlighted. What a tap does while reading can be set (tapped line being read: nothing / pause / read again; another line: jump / stop and mark / nothing). Scrolling by hand while listening stops the automatic scrolling and shows a "Về dòng đang đọc" button. Also: where the line being read stays when the reader follows the voice (bottom / top / middle / page), and reading from a tapped word (settings). |  |
+| [Auto sync reading history](#auto-sync-reading-history) | Automatically syncs your reading history on app start, after logging in, and when returning after more than 5 minutes, merging other devices' progress with book titles and saving free chapters 1–50 to your account. Also lets the "Đồng bộ" button work with an empty bookshelf and keeps deleted history books from returning. |  |
+| [Background reading](#background-reading) | Keeps reading aloud and advancing to the next chapter when the screen is off or the app is in the background. |  |
+| [Fix Google login](#fix-google-login) | Fixes "Đăng nhập với Google" failing with an error. Required for Google sign-in to work on this app version. |  |
+| [Remember listening speed](#remember-listening-speed) | Remembers your chosen reading speed across app restarts instead of resetting to 1x, using one speed for all books. Replaces the speed menu with a YouTube-style slider and customizable quick-select buttons. |  |
+| [Resume listening position](#resume-listening-position) | Returns to the last line you listened to when reopening a book from your bookshelf or "Đọc truyện". Can highlight the line, ask before resuming, or start reading automatically. |  |
+| [Show chapter titles](#show-chapter-titles) | Shows real chapter titles instead of "Vô Đề Mục" in the chapter list, reader, and TTS by reading the title from each chapter's opening line. Titles are cached on your device and do not require logging in. |  |
+| [TTS media controls](#tts-media-controls) | Shows live reading status and chapter progress (Dòng x/y) on the lock screen and media notification, with working play/pause and chapter skip buttons. Also fixes the voice bar's previous-chapter button. |  |
+| [TTS reliability](#tts-reliability) | Fixes text-to-speech stopping after calls or failing to play, lets you pick a TTS engine and Vietnamese voice, applies speed changes immediately, and resumes from the exact word where reading stopped. Also reads "~" and "..." more naturally with a short pause. |  |
+| [Tap a line to listen from it](#tap-a-line-to-listen-from-it) | Lets you tap any line in vertical reading mode to jump the voice reading there, pause, or start from that word. Scrolling manually pauses auto-follow and shows a "Về dòng đang đọc" button, with customizable tap and scroll behaviors in settings. |  |
 
 </details>
 

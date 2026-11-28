@@ -1,3 +1,9 @@
+## [2.2.4](https://github.com/CozyCode890/HoiTruyenChu-patches/compare/v2.2.3...v2.2.4) (2026-11-28)
+
+### 🐛 Bug Fixes
+
+* clearer wording in the settings screen and patch descriptions ([2e81197](https://github.com/CozyCode890/HoiTruyenChu-patches/commit/2e81197754caf12e38e594ea10d51c08e5271062))
+
 ## [2.2.3](https://github.com/CozyCode890/HoiTruyenChu-patches/compare/v2.2.2...v2.2.3) (2026-11-28)
 
 ### 🔧 Improvements
