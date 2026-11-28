@@ -104,7 +104,7 @@ public final class FixGoogleLoginPatch implements Interceptor {
         if (token == null || SystemClock.elapsedRealtime() - firebaseIdTokenAt > TOKEN_MAX_AGE_MS) {
             Log.w(TAG, "no recent Firebase sign-in, sending the original login request");
             Response original = chain.proceed(request);
-            status(original.isSuccessful() ? "ok" : "Lỗi: không thấy đăng nhập Google (HTTP " + original.code() + ")");
+            status(original.isSuccessful() ? "ok" : "lỗi (chưa nhận được đăng nhập Google, HTTP " + original.code() + ")");
             return original;
         }
 
@@ -114,7 +114,7 @@ public final class FixGoogleLoginPatch implements Interceptor {
         Response response = chain.proceed(fixed);
         if (!response.isSuccessful()) {
             Log.w(TAG, "login with Firebase ID token -> HTTP " + response.code());
-            status("Lỗi: máy chủ trả về HTTP " + response.code());
+            status("lỗi máy chủ (HTTP " + response.code() + ")");
             return response;
         }
         firebaseIdToken = null;

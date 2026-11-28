@@ -11,8 +11,8 @@ import app.morphe.patcher.patch.patch
 @Suppress("unused")
 val fixGoogleLoginPatch = patch(
     name = "Fix Google login",
-    description = "Fixes \"Đăng nhập với Google\" failing with error 400: the server now expects the " +
-            "Firebase ID token (like the website) instead of the email sent by this app version.",
+    description = "Fixes \"Đăng nhập với Google\" failing with an error. Required for Google sign-in " +
+            "to work on this app version.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_ITRUYENCHU)

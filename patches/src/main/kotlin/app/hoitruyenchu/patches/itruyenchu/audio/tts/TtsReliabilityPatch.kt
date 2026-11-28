@@ -40,12 +40,9 @@ private val wakeLockPermissionPatch = patch {
 @Suppress("unused")
 val ttsReliabilityPatch = patch(
     name = "TTS reliability",
-    description = "Fixes text-to-speech reading that stops after a phone call or does nothing when pressing play: " +
-            "re-creates the TTS engine when it dies, pauses during calls and resumes afterwards, " +
-            "retries failed lines, uses the correct Vietnamese voice, and applies a new speed right away " +
-            "instead of after pause + play. A stopped line goes on from the word it was stopped at (pause, " +
-            "lock screen, call, speed change, reopening the book), not from its start. \"~\" and \"...\" are " +
-            "read naturally (\"1~2\" = \"1 đến 2\", a short pause after \"...\", quotes around \"...\" are not read).",
+    description = "Fixes text-to-speech stopping after calls or failing to play, lets you pick a TTS engine " +
+            "and Vietnamese voice, applies speed changes immediately, and resumes from the exact word " +
+            "where reading stopped. Also reads \"~\" and \"...\" more naturally with a short pause.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_ITRUYENCHU)

@@ -11,9 +11,9 @@ import app.morphe.patcher.patch.patch
 @Suppress("unused")
 val resumeListeningPatch = patch(
     name = "Resume listening position",
-    description = "Opening a book from the bookshelf or \"Đọc truyện\" goes back to the line where the " +
-            "listening stopped: the voice bar opens with the play button and the line is highlighted, " +
-            "pressing play continues from there.",
+    description = "Returns to the last line you listened to when reopening a book from your bookshelf " +
+            "or \"Đọc truyện\". Can highlight the line, ask before resuming, " +
+            "or start reading automatically.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_ITRUYENCHU)

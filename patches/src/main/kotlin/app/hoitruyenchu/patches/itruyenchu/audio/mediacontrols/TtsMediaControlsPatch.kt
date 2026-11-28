@@ -20,10 +20,10 @@ import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 @Suppress("unused")
 val ttsMediaControlsPatch = patch(
     name = "TTS media controls",
-    description = "The media widget / lock screen shows the TTS reading instead of the silent 6 s file " +
-            "of the voice bar: playing or paused, the position in the chapter (line x/y). Its play / pause " +
-            "and next / previous buttons work like the voice bar's buttons (next / previous chapter), and " +
-            "the previous chapter button of the voice bar, which did nothing, opens the previous chapter.",
+    description = "Shows live reading status and chapter progress (Dòng x/y) on the lock screen and " +
+            "media notification, with working play/pause and chapter skip buttons. Also fixes the " +
+            "voice bar's " +
+            "previous-chapter button.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_ITRUYENCHU)

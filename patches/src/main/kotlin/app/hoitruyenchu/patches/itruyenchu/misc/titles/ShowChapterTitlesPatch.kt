@@ -13,9 +13,9 @@ import app.morphe.patcher.patch.patch
 @Suppress("unused")
 val showChapterTitlesPatch = patch(
     name = "Show chapter titles",
-    description = "Shows the real chapter titles instead of \"Vô Đề Mục\" in the chapter list, the reader " +
-            "and the TTS: books whose chapter list only has \"Chương N\" get the title from the first " +
-            "line of the chapter text (public preview, no login needed), cached on the device.",
+    description = "Shows real chapter titles instead of \"Vô Đề Mục\" in the chapter list, reader, and TTS " +
+            "by reading the title from each chapter's opening line. Titles are cached on your device and " +
+            "do not require logging in.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_ITRUYENCHU)

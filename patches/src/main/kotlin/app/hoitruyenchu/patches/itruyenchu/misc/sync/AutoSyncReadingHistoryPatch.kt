@@ -21,10 +21,10 @@ import com.android.tools.smali.dexlib2.Opcode
 @Suppress("unused")
 val autoSyncReadingHistoryPatch = patch(
     name = "Auto sync reading history",
-    description = "Syncs the reading history with the iTruyenChu account without pressing the sync button: " +
-            "free chapters 1-50, which the server never sees, are recorded too, and the progress " +
-            "from other devices is merged in (with book titles) when the app starts and right after logging in. " +
-            "The \"Đồng bộ\" button also works when the bookshelf is empty.",
+    description = "Automatically syncs your reading history on app start, after logging in, and when " +
+            "returning after more than 5 minutes, merging other devices' progress with book titles " +
+            "and saving free chapters 1–50 to your account. Also lets the \"Đồng bộ\" button work with an " +
+            "empty bookshelf and keeps deleted history books from returning.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_ITRUYENCHU)

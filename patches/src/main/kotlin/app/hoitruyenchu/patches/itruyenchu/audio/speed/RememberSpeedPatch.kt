@@ -11,9 +11,9 @@ import app.morphe.patcher.patch.patch
 @Suppress("unused")
 val rememberSpeedPatch = patch(
     name = "Remember listening speed",
-    description = "Keeps the speed chosen in the voice bar after the app is restarted (the app saved it " +
-            "under a misspelled key and always started at 1x). One speed for all books. The speed menu " +
-            "becomes a YouTube-like panel (big speed, - slider +, quick choices) with a settable range and step.",
+    description = "Remembers your chosen reading speed across app restarts instead of resetting to 1x, " +
+            "using one speed for all books. Replaces the speed menu with a YouTube-style slider and " +
+            "customizable quick-select buttons.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_ITRUYENCHU)

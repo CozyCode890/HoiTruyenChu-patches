@@ -129,7 +129,7 @@ public final class SyncScript {
             + "    // Same as the bookshelf button. options: the app's toast object of a button press, or null (login:\n"
             + "    // toast only when books were added). A press during a running sync gets that sync's result.\n"
             + "    var pending = null;\n"
-            + "    var ERROR = 'Có lỗi khi đồng bộ truyện';\n"
+            + "    var ERROR = 'Không đồng bộ được, hãy thử lại';\n"
             + "    var DONE = 'Đồng bộ truyện thành công';\n"
             + "    function message(type, text, options) {\n"
             + "      return { type: type, text1: text, position: (options && options.position) || 'bottom' };\n"

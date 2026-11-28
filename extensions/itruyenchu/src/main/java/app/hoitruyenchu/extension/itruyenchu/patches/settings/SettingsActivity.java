@@ -148,7 +148,7 @@ public final class SettingsActivity extends Activity {
 
         if (restartNeeded) {
             header("Cần khởi động lại");
-            action("Khởi động lại app", "Một số thay đổi chỉ áp dụng sau khi mở lại app", true, this::restartApp);
+            action("Khởi động lại app", "Áp dụng thay đổi ở thông báo, nhập hoặc đặt lại cài đặt", true, this::restartApp);
         }
 
         if (HtcPatches.ttsReliability()) ttsSection();
@@ -170,20 +170,20 @@ public final class SettingsActivity extends Activity {
     private void ttsSection() {
         header("Đọc to (TTS)");
         String m = HtcSettings.TTS_ENABLED;
-        toggle(m, "Sửa lỗi đọc to", "Tạo lại bộ đọc khi bị lỗi, xử lý cuộc gọi, đọc lại dòng lỗi, dùng đúng giọng tiếng Việt", true);
+        toggle(m, "Sửa lỗi đọc to", "Đọc ổn định hơn, xử lý cuộc gọi và đúng giọng tiếng Việt", true);
         boolean on = HtcSettings.bool(m);
         choice(HtcSettings.TTS_CALL, "Khi có cuộc gọi", on,
                 new Object[]{"resume", "pause", "none"},
-                new String[]{"Tạm dừng, đọc tiếp sau cuộc gọi", "Chỉ tạm dừng", "Không làm gì"});
+                new String[]{"Tạm dừng rồi đọc tiếp", "Chỉ tạm dừng", "Không làm gì"});
         choice(HtcSettings.TTS_RETRIES, "Đọc lại dòng bị lỗi", on,
                 new Object[]{0, 1, 2, 3, 4, 5},
                 new String[]{"Không đọc lại", "1 lần", "2 lần", "3 lần", "4 lần", "5 lần"});
         choice(HtcSettings.TTS_ELLIPSIS_PAUSE, "Ngắt sau dấu \"...\"", on,
                 new Object[]{0, 300, 500, 1000},
                 new String[]{"Không ngắt", "Ngắn (0.3 giây)", "Vừa (0.5 giây)", "Dài (1 giây)"});
-        action("Bộ đọc (TTS engine)", engineLabel(), on, this::pickEngine);
+        action("Bộ đọc TTS", engineLabel(), on, this::pickEngine);
         action("Giọng đọc", voiceLabel(), on, this::pickVoice);
-        action("Nghe thử", "Đọc một câu mẫu với bộ đọc, giọng và tốc độ đang chọn", on, this::preview);
+        action("Nghe thử", "Đọc một câu mẫu với bộ đọc và giọng đang chọn", on, this::preview);
         reset("tts.", "Đọc to (TTS)");
     }
 
@@ -191,16 +191,16 @@ public final class SettingsActivity extends Activity {
         header("Nghe tiếp đúng chữ");
         String m = HtcSettings.WORD_ENABLED;
         toggle(m, "Nghe tiếp từ chữ đang đọc",
-                "Dừng rồi phát lại, sau cuộc gọi, khi đổi tốc độ hay mở lại truyện thì đọc tiếp từ chữ đó, không đọc lại từ đầu dòng",
+                "Không đọc lại từ đầu dòng khi dừng, đổi tốc độ hay mở lại",
                 true);
         boolean on = HtcSettings.bool(m);
-        choice(HtcSettings.WORD_FROM, "Đọc tiếp từ (khi dừng/phát, sau cuộc gọi, mở lại truyện; đổi tốc độ luôn đúng chữ)", on,
+        choice(HtcSettings.WORD_FROM, "Đọc tiếp từ", on,
                 new Object[]{"word", "back", "phrase", "seconds"},
-                new String[]{"Đúng chữ đang đọc", "Lùi 1–2 chữ", "Đầu cụm gần nhất (sau dấu phẩy, dấu chấm)", "Lùi khoảng 2 giây"});
+                new String[]{"Đúng chữ đã dừng", "Lùi 1–2 chữ", "Đầu cụm gần nhất (sau dấu câu)", "Lùi khoảng 2 giây"});
         boolean reader = on && HtcPatches.tapToSeek();
-        choice(HtcSettings.WORD_TAP, "Chạm vào chữ trong dòng", reader,
+        choice(HtcSettings.WORD_TAP, "Chạm chữ trong dòng", reader,
                 new Object[]{"line", "word"},
-                new String[]{"Đọc từ đầu dòng", "Đọc từ chữ được chạm (ước lượng, có thể lệch 1 chữ)"});
+                new String[]{"Đọc từ đầu dòng", "Đọc từ chữ đã chạm (có thể lệch 1 chữ)"});
         reset("word.", "Nghe tiếp đúng chữ");
     }
 
@@ -214,39 +214,39 @@ public final class SettingsActivity extends Activity {
     private void speedSection() {
         header("Tốc độ đọc");
         String m = HtcSettings.SPEED_ENABLED;
-        toggle(m, "Giữ tốc độ khi mở lại app", "Một tốc độ cho mọi truyện. Tắt thì menu tốc độ cũng về như app", true);
+        toggle(m, "Nhớ tốc độ đọc", "Giữ một tốc độ cho mọi truyện; tắt để về như app gốc", true);
         boolean on = HtcSettings.bool(m);
         float speed = shownSpeed > 0 ? shownSpeed : HtcSettings.savedSpeed();
-        action("Tốc độ đọc", String.format(Locale.US, "%.2fx · chỉnh từ %s đến %s", speed,
+        action("Tốc độ hiện tại", String.format(Locale.US, "%.2fx · từ %s đến %s", speed,
                 speedLabel(HtcSettings.integer(HtcSettings.SPEED_MIN)), speedLabel(HtcSettings.integer(HtcSettings.SPEED_MAX))),
                 on, this::pickSpeed);
         choice(HtcSettings.SPEED_MENU, "Kiểu menu tốc độ", on,
                 new Object[]{"youtube", "list"},
-                new String[]{"Kiểu YouTube (thay menu cũ)", "Danh sách của app + thanh kéo phía trên"});
+                new String[]{"Kiểu YouTube", "Danh sách của app + thanh kéo"});
         choice(HtcSettings.SPEED_MIN, "Tốc độ thấp nhất", on,
                 new Object[]{10, 25, 50, 75, 100},
                 new String[]{"0.10x", "0.25x", "0.50x", "0.75x", "1.00x"});
         choice(HtcSettings.SPEED_MAX, "Tốc độ cao nhất", on,
                 new Object[]{150, 200, 250, 300, 350, 400},
-                new String[]{"1.50x", "2.00x", "2.50x", "3.00x", "3.50x", "4.00x (bộ đọc có thể không nhanh hơn được)"});
-        choice(HtcSettings.SPEED_STEP, "Bước của nút −/+ và thanh kéo", on,
+                new String[]{"1.50x", "2.00x", "2.50x", "3.00x", "3.50x", "4.00x (bộ đọc có thể không nhanh hơn)"});
+        choice(HtcSettings.SPEED_STEP, "Bước tăng giảm tốc độ", on,
                 new Object[]{1, 5, 10, 25},
-                new String[]{"0.01", "0.05", "0.10", "0.25"});
+                new String[]{"0.01x", "0.05x", "0.10x", "0.25x"});
         choice(HtcSettings.SPEED_CHIPS_MODE, "Nút chọn nhanh", on,
                 new Object[]{"auto", "custom", "recent"},
-                new String[]{"Tự sinh từ thấp nhất đến cao nhất", "Tự nhập danh sách", "1.0x + các tốc độ dùng gần đây"});
+                new String[]{"Chia đều từ thấp đến cao", "Tự nhập danh sách", "1.0x và các tốc độ gần đây"});
         String chipsMode = HtcSettings.string(HtcSettings.SPEED_CHIPS_MODE);
         if ("auto".equals(chipsMode)) {
-            choice(HtcSettings.SPEED_CHIP_STEP, "Khoảng cách các nút chọn nhanh", on,
+            choice(HtcSettings.SPEED_CHIP_STEP, "Khoảng cách nút chọn nhanh", on,
                     new Object[]{10, 25, 50},
-                    new String[]{"0.10", "0.25", "0.50"});
+                    new String[]{"0.10x", "0.25x", "0.50x"});
         } else if ("custom".equals(chipsMode)) {
             action("Danh sách nút chọn nhanh", HtcSettings.string(HtcSettings.SPEED_CHIPS), on, this::editChips);
         }
-        toggle(HtcSettings.SPEED_SNAP, "Hút vào mốc khi kéo",
-                "Kéo gần 1.0x hoặc một nút chọn nhanh thì tự dính vào, rung nhẹ", on);
-        toggle(HtcSettings.SPEED_EXTRA_LEVELS, "Thêm nút chọn nhanh vào danh sách của app",
-                "Chỉ khi kiểu menu là \"Danh sách của app\"", on && "list".equals(HtcSettings.string(HtcSettings.SPEED_MENU)));
+        toggle(HtcSettings.SPEED_SNAP, "Dính vào mốc khi kéo",
+                "Kéo gần 1.0x hay nút chọn nhanh sẽ tự dính, rung nhẹ", on);
+        toggle(HtcSettings.SPEED_EXTRA_LEVELS, "Thêm nút chọn nhanh vào danh sách",
+                "Chỉ dùng khi chọn kiểu \"Danh sách của app\"", on && "list".equals(HtcSettings.string(HtcSettings.SPEED_MENU)));
         reset("speed.", "Tốc độ đọc");
     }
 
@@ -264,7 +264,7 @@ public final class SettingsActivity extends Activity {
         box.addView(input, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         new AlertDialog.Builder(this)
                 .setTitle("Nút chọn nhanh")
-                .setMessage("Các tốc độ, cách nhau bởi dấu phẩy (ngoài khoảng thấp nhất – cao nhất thì bỏ qua)")
+                .setMessage("Nhập các tốc độ, cách nhau bằng dấu phẩy (ngoài giới hạn sẽ bỏ qua)")
                 .setView(box)
                 .setPositiveButton("Lưu", (d, w) -> {
                     HtcSettings.put(HtcSettings.SPEED_CHIPS, input.getText().toString().trim());
@@ -277,8 +277,8 @@ public final class SettingsActivity extends Activity {
     private void mediaSection() {
         header("Điều khiển trên màn hình khóa");
         String m = HtcSettings.MEDIA_ENABLED;
-        toggle(m, "Điều khiển việc đọc từ thông báo",
-                "Thông báo / màn hình khóa hiện việc đọc (dòng x/y), các nút điều khiển việc đọc. Cần khởi động lại app",
+        toggle(m, "Điều khiển từ thông báo",
+                "Hiện dòng x/y và nút điều khiển; cần khởi động lại app",
                 true, true);
         reset("media.", "Điều khiển trên màn hình khóa");
     }
@@ -286,7 +286,7 @@ public final class SettingsActivity extends Activity {
     private void resumeSection() {
         header("Nghe tiếp vị trí cũ");
         String m = HtcSettings.RESUME_ENABLED;
-        toggle(m, "Nhớ dòng đang nghe", "Mở lại truyện thì quay về dòng đã nghe tới", true);
+        toggle(m, "Nhớ dòng đang nghe", "Mở lại truyện sẽ quay về dòng đã nghe tới", true);
         choice(HtcSettings.RESUME_MODE, "Khi mở truyện", HtcSettings.bool(m),
                 new Object[]{"highlight", "play", "ask"},
                 new String[]{"Chỉ đánh dấu dòng", "Đọc luôn", "Hỏi \"Nghe tiếp từ dòng X?\""});
@@ -296,43 +296,43 @@ public final class SettingsActivity extends Activity {
     private void tapSection() {
         header("Chạm dòng để nghe");
         String m = HtcSettings.TAP_ENABLED;
-        toggle(m, "Chạm vào dòng để nghe từ dòng đó", "Đọc theo chiều dọc", true);
+        toggle(m, "Chạm dòng để nghe từ đó", "Áp dụng khi đọc truyện kiểu cuộn dọc", true);
         boolean on = HtcSettings.bool(m);
-        choice(HtcSettings.TAP_MIN_PRESS, "Giữ tối thiểu khi chạm", on,
+        choice(HtcSettings.TAP_MIN_PRESS, "Thời gian giữ khi chạm", on,
                 new Object[]{0, 100, 150, 250, 400},
-                new String[]{"Không cần (chạm là nhận)", "0.1 giây", "0.15 giây (lọc chạm lướt vô tình)", "0.25 giây", "0.4 giây"});
+                new String[]{"Không cần (chạm là nhận)", "0.1 giây", "0.15 giây (tránh chạm nhầm)", "0.25 giây", "0.4 giây"});
         toggle(HtcSettings.TAP_RETURN_BUTTON, "Nút \"Về dòng đang đọc\"",
-                "Hiện khi tự cuộn trang lúc đang nghe", on);
-        choice(HtcSettings.TAP_AUTO_RETURN, "Tự quay về dòng đang đọc", on,
+                "Hiện khi bạn cuộn trang lúc đang nghe", on);
+        choice(HtcSettings.TAP_AUTO_RETURN, "Tự về dòng đang đọc", on,
                 new Object[]{0, 5, 10, 30},
                 new String[]{"Tắt", "Sau 5 giây không chạm", "Sau 10 giây không chạm", "Sau 30 giây không chạm"});
-        choice(HtcSettings.TAP_CURRENT_LINE, "Chạm dòng đang đọc (khi đang phát)", on,
+        choice(HtcSettings.TAP_CURRENT_LINE, "Chạm dòng đang đọc", on,
                 new Object[]{"nothing", "pause", "restart"},
-                new String[]{"Không làm gì", "Tạm dừng / đọc tiếp", "Đọc lại dòng từ đầu"});
-        choice(HtcSettings.TAP_OTHER_LINE, "Chạm dòng khác (khi đang phát)", on,
+                new String[]{"Không làm gì", "Tạm dừng hoặc đọc tiếp", "Đọc lại dòng từ đầu"});
+        choice(HtcSettings.TAP_OTHER_LINE, "Chạm dòng khác", on,
                 new Object[]{"jump", "mark", "nothing"},
-                new String[]{"Nhảy tới dòng đó và đọc tiếp", "Dừng đọc, chỉ đánh dấu dòng", "Không làm gì"});
-        choice(HtcSettings.TAP_CLOSED_BAR, "Chạm khi thanh đọc đang đóng", on,
+                new String[]{"Nhảy tới và đọc tiếp", "Dừng lại, đánh dấu dòng", "Không làm gì"});
+        choice(HtcSettings.TAP_CLOSED_BAR, "Chạm khi thanh đọc đóng", on,
                 new Object[]{"mark", "nothing", "play"},
                 new String[]{"Mở thanh đọc, đánh dấu dòng", "Không làm gì", "Mở thanh đọc và đọc luôn"});
-        choice(HtcSettings.TAP_FOLLOW_POSITION, "Vị trí dòng đang đọc khi tự cuộn", on,
+        choice(HtcSettings.TAP_FOLLOW_POSITION, "Vị trí dòng khi tự cuộn", on,
                 new Object[]{"bottom", "top", "middle", "page"},
-                new String[]{"Dưới cùng (ngay trên thanh đọc)", "Trên cùng (như app)", "Ở giữa",
-                        "Chỉ cuộn khi dòng sắp khuất (lật cả trang)"});
+                new String[]{"Dưới cùng (trên thanh đọc)", "Trên cùng (như app gốc)", "Giữa màn hình",
+                        "Chỉ cuộn khi sắp khuất (lật trang)"});
         reset("tap.", "Chạm dòng để nghe");
     }
 
     private void titlesSection() {
         header("Tên chương");
         String m = HtcSettings.TITLES_ENABLED;
-        toggle(m, "Hiện tên chương thật", "Thay \"Vô Đề Mục\" bằng tên lấy từ dòng đầu của chương", true);
+        toggle(m, "Hiện tên chương thật", "Thay \"Vô Đề Mục\" bằng tên từ nội dung chương", true);
         boolean on = HtcSettings.bool(m);
         toggle(HtcSettings.TITLES_WIFI_ONLY, "Chỉ tải tên chương qua Wi-Fi",
-                "Không tải khi dùng dữ liệu di động (tên đã có vẫn hiện)", on);
-        toggle(HtcSettings.TITLES_SKIP_HEADER, "Không đọc dòng tên chương",
-                "Bỏ qua dòng \"Chương N: ...\" khi đọc to", on);
+                "Không tải bằng dữ liệu di động; tên đã lưu vẫn hiện", on);
+        toggle(HtcSettings.TITLES_SKIP_HEADER, "Bỏ qua dòng tên chương",
+                "Không đọc to dòng \"Chương N: ...\" đầu chương", on);
         action("Xóa bộ nhớ tên chương", "Đang dùng " + size(ChapterTitlesPatch.cacheSize()), true, () ->
-                confirm("Xóa bộ nhớ tên chương?", "Tên chương sẽ được tải lại khi mở danh sách chương.", () -> {
+                confirm("Xóa bộ nhớ tên chương?", "Tên chương sẽ được tải lại khi bạn mở D.S Chương", () -> {
                     int n = ChapterTitlesPatch.clearCache();
                     toast("Đã xóa tên chương của " + n + " truyện");
                     render();
@@ -343,12 +343,12 @@ public final class SettingsActivity extends Activity {
     private void syncSection() {
         header("Đồng bộ lịch sử đọc");
         String m = HtcSettings.SYNC_ENABLED;
-        toggle(m, "Tự đồng bộ với tài khoản", "Cả nút \"Đồng bộ\" của tủ truyện", true);
+        toggle(m, "Tự đồng bộ với tài khoản", "Cả nút đồng bộ trong Tủ truyện", true);
         boolean on = HtcSettings.bool(m);
-        toggle(HtcSettings.SYNC_ON_START, "Khi mở app", "Lấy tiến độ đọc từ máy khác", on);
+        toggle(HtcSettings.SYNC_ON_START, "Khi mở app", "Tải tiến độ đọc từ máy khác về", on);
         toggle(HtcSettings.SYNC_ON_LOGIN, "Ngay sau khi đăng nhập", null, on);
-        toggle(HtcSettings.SYNC_ON_RESUME, "Khi quay lại app", "Sau hơn 5 phút chạy nền", on);
-        toggle(HtcSettings.SYNC_RECORD_FREE, "Ghi lại chương miễn phí 1–50", "Máy chủ không tự ghi các chương này", on);
+        toggle(HtcSettings.SYNC_ON_RESUME, "Khi quay lại app", "Sau hơn 5 phút ở nền", on);
+        toggle(HtcSettings.SYNC_RECORD_FREE, "Ghi lại chương miễn phí 1–50", "Máy chủ không tự lưu các chương miễn phí", on);
         choice(HtcSettings.SYNC_TOASTS, "Thông báo khi tự đồng bộ", on,
                 new Object[]{"all", "changes", "none"},
                 new String[]{"Luôn hiện", "Chỉ khi có thay đổi hoặc lỗi", "Không hiện"});
@@ -361,29 +361,29 @@ public final class SettingsActivity extends Activity {
         long at = HtcSettings.statusTime(HtcSettings.LOGIN_STATUS);
         String when = at > 0 ? " lúc " + new SimpleDateFormat("HH:mm dd/MM", Locale.US).format(new Date(at)) : "";
         String summary;
-        if (status == null) summary = "Đang hoạt động · chưa đăng nhập Google từ khi cài bản này";
-        else if ("ok".equals(status)) summary = "Đang hoạt động · lần cuối thành công" + when;
-        else summary = "Đang hoạt động · lần cuối " + status + when;
-        info("Sửa lỗi đăng nhập Google", summary + "\n(Không tắt được: tắt đi thì không đăng nhập Google được)");
+        if (status == null) summary = "Đang bật · chưa đăng nhập Google từ khi cài bản này";
+        else if ("ok".equals(status)) summary = "Đang bật · lần cuối thành công" + when;
+        else summary = "Đang bật · lần cuối " + status + when;
+        info("Sửa lỗi đăng nhập Google", summary + "\nLuôn bật để đăng nhập Google không bị lỗi");
     }
 
     private void generalSection() {
         header("Chung");
-        toggle(HtcSettings.GEAR_ENABLED, "Nút mở cài đặt (bánh răng nổi)",
-                "Góc trên bên phải; chấm đỏ khi có bản vá mới", true);
+        toggle(HtcSettings.GEAR_ENABLED, "Nút cài đặt nổi",
+                "Hiện ở góc trên bên phải; có chấm đỏ khi có bản mới", true);
         choice(HtcSettings.GEAR_SCREENS, "Hiện nút ở", HtcSettings.bool(HtcSettings.GEAR_ENABLED),
                 new Object[]{"reader", "tabs", "home", "all"},
                 new String[]{"Chỉ trong trình đọc", "Các tab chính", "Chỉ Trang chủ", "Mọi màn hình"});
-        toggle(HtcSettings.DEBUG, "Ghi log gỡ lỗi", "Các script ghi log [HTC-...] để báo lỗi", true);
-        action("Chia sẻ log", "Gửi log HTC-* (để báo lỗi)", true, this::shareLog);
-        action("Xuất cài đặt", "Lưu ra file .json", true, () -> {
+        toggle(HtcSettings.DEBUG, "Ghi log gỡ lỗi", "Lưu lại quá trình hoạt động để tìm nguyên nhân lỗi", true);
+        action("Chia sẻ log", "Gửi cho tác giả bản vá khi báo lỗi", true, this::shareLog);
+        action("Xuất cài đặt", "Lưu cài đặt thành file .json", true, () -> {
             Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
             intent.addCategory(Intent.CATEGORY_OPENABLE);
             intent.setType("application/json");
             intent.putExtra(Intent.EXTRA_TITLE, "hoitruyenchu-settings.json");
             startForResult(intent, REQUEST_EXPORT);
         });
-        action("Nhập cài đặt", "Đọc từ file .json đã xuất", true, () -> {
+        action("Nhập cài đặt", "Khôi phục từ file .json đã lưu", true, () -> {
             Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
             intent.addCategory(Intent.CATEGORY_OPENABLE);
             intent.setType("*/*");
@@ -391,10 +391,10 @@ public final class SettingsActivity extends Activity {
             startForResult(intent, REQUEST_IMPORT);
         });
         action("Đặt lại tất cả", "Đưa mọi cài đặt về mặc định", true, () ->
-                confirm("Đặt lại tất cả?", "Mọi cài đặt của HoiTruyenChu về mặc định.", () -> {
+                confirm("Đặt lại tất cả?", "Mọi cài đặt của HoiTruyenChu sẽ trở về mặc định.", () -> {
                     HtcSettings.reset("");
                     restartNeeded = true;
-                    toast("Đã đặt lại");
+                    toast("Đã đặt lại mặc định");
                     render();
                 }));
         action("Khởi động lại app", null, true, this::restartApp);
@@ -512,7 +512,7 @@ public final class SettingsActivity extends Activity {
 
     private void reset(String prefix, String name) {
         action("Đặt lại mặc định", null, true, () ->
-                confirm("Đặt lại \"" + name + "\"?", "Các cài đặt của mục này về mặc định.", () -> {
+                confirm("Đặt lại \"" + name + "\"?", "Các cài đặt trong mục này sẽ về mặc định.", () -> {
                     HtcSettings.reset(prefix);
                     if ("media.".equals(prefix)) restartNeeded = true;
                     if ("tts.".equals(prefix)) startProbe("");
@@ -631,7 +631,7 @@ public final class SettingsActivity extends Activity {
             labels.add(e.label);
         }
         int selected = Math.max(0, values.indexOf(HtcSettings.string(HtcSettings.TTS_ENGINE)));
-        pick("Bộ đọc (TTS engine)", labels.toArray(new String[0]), selected, which -> {
+        pick("Bộ đọc TTS", labels.toArray(new String[0]), selected, which -> {
             String engine = values.get(which);
             if (engine.equals(HtcSettings.string(HtcSettings.TTS_ENGINE))) return;
             // The voices belong to the engine: back to automatic.
@@ -745,13 +745,13 @@ public final class SettingsActivity extends Activity {
         new AlertDialog.Builder(this)
                 .setTitle("Tốc độ đọc")
                 .setView(box)
-                .setPositiveButton("Đặt", (d, w) -> {
+                .setPositiveButton("Lưu", (d, w) -> {
                     float speed = (min + bar.getProgress() * step) / 100f;
                     if (HtcSettings.sendSpeed(speed)) {
                         shownSpeed = speed;
-                        toast(String.format(Locale.US, "Tốc độ đọc: %.2fx", speed));
+                        toast(String.format(Locale.US, "Đã đặt tốc độ: %.2fx", speed));
                     } else {
-                        toast("Mở app (thanh đọc) rồi thử lại");
+                        toast("Hãy mở thanh đọc trong truyện rồi thử lại");
                     }
                     render();
                 })
@@ -853,7 +853,7 @@ public final class SettingsActivity extends Activity {
     }
 
     private void checkUpdate() {
-        toast("Đang kiểm tra...");
+        toast("Đang kiểm tra cập nhật...");
         new Thread(() -> {
             String tag = null, page = null, error = null;
             HttpURLConnection connection = null;
@@ -883,18 +883,18 @@ public final class SettingsActivity extends Activity {
             main.post(() -> {
                 if (isFinishing()) return;
                 if (latest == null || latest.isEmpty()) {
-                    toast("Không kiểm tra được" + (failure != null ? ": " + failure : ""));
+                    toast("Không kiểm tra được cập nhật" + (failure != null ? ": " + failure : ""));
                     return;
                 }
                 String mine = HtcPatches.version();
                 String latestVersion = latest.startsWith("v") ? latest.substring(1) : latest;
                 boolean newer = compareVersions(latestVersion, mine) > 0;
                 AlertDialog.Builder dialog = new AlertDialog.Builder(this)
-                        .setTitle(newer ? "Đã có bản mới" : "Đang dùng bản mới nhất")
-                        .setMessage("Bản mới nhất: " + latestVersion + "\nBản đang dùng: "
+                        .setTitle(newer ? "Đã có bản cập nhật mới" : "Đang dùng bản mới nhất")
+                        .setMessage("Bản mới nhất: " + latestVersion + "\nBản hiện tại: "
                                 + (TextUtils.isEmpty(mine) ? "?" : mine));
                 if (newer) dialog.setPositiveButton("Mở trang tải", (d, w) -> open(url)).setNegativeButton("Để sau", null);
-                else dialog.setPositiveButton("OK", null);
+                else dialog.setPositiveButton("Đóng", null);
                 dialog.show();
             });
         }, "HTC-Update").start();
@@ -947,7 +947,7 @@ public final class SettingsActivity extends Activity {
         new AlertDialog.Builder(this)
                 .setTitle(title)
                 .setMessage(message)
-                .setPositiveButton("Đồng ý", (d, w) -> onYes.run())
+                .setPositiveButton("Xác nhận", (d, w) -> onYes.run())
                 .setNegativeButton("Hủy", null)
                 .show();
     }

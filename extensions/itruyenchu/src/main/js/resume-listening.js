@@ -107,9 +107,9 @@
         try {
           if (!loaded || loaded.slug !== slug || loaded.n !== n || V.getState().activeLine !== line) return;
           var RN = g.__htcR('rn');
-          RN.Alert.alert('Nghe ti\u1ebfp?', 'Nghe ti\u1ebfp t\u1eeb d\u00f2ng ' + (line + 1) + '?', [
-            { text: 'T\u1eeb \u0111\u1ea7u ch\u01b0\u01a1ng', onPress: function () { try { V.getState().setActiveLine(0); } catch (e) {} } },
-            { text: 'Nghe ti\u1ebfp', onPress: function () { playWhenReady(slug, n, line); } }
+          RN.Alert.alert('Nghe tiếp?', 'Nghe tiếp từ dòng ' + (line + 1) + '?', [
+            { text: 'Từ đầu chương', onPress: function () { try { V.getState().setActiveLine(0); } catch (e) {} } },
+            { text: 'Nghe tiếp', onPress: function () { playWhenReady(slug, n, line); } }
           ], { cancelable: true });
         } catch (e) { log('ask failed ' + e); }
       }, 1200);

@@ -90,7 +90,7 @@
     // Same as the bookshelf button. options: the app's toast object of a button press, or null (login:
     // toast only when books were added). A press during a running sync gets that sync's result.
     var pending = null;
-    var ERROR = 'Có lỗi khi đồng bộ truyện';
+    var ERROR = 'Không đồng bộ được, hãy thử lại';
     var DONE = 'Đồng bộ truyện thành công';
     function message(type, text, options) {
       return { type: type, text1: text, position: (options && options.position) || 'bottom' };

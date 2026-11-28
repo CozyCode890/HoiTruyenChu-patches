@@ -14,9 +14,8 @@ import app.morphe.patcher.util.smali.ExternalLabel
 @Suppress("unused")
 val backgroundReadingPatch = patch(
     name = "Background reading",
-    description = "Keeps reading with the screen off: React Native pauses JS timers when the app goes to " +
-            "the background, which stops the app from starting the next chapter. " +
-            "JS timers keep running while a reading session is active.",
+    description = "Keeps reading aloud and advancing to the next chapter when the screen is off or " +
+            "the app is in the background.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_ITRUYENCHU)
