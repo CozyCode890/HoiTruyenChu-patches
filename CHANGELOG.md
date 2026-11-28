@@ -1,3 +1,9 @@
+## [2.2.1](https://github.com/CozyCode890/HoiTruyenChu-patches/compare/v2.2.0...v2.2.1) (2026-11-28)
+
+### 🐛 Bug Fixes
+
+* remove the mini player, sleep timer, headphones pause and word highlight ([b1ae700](https://github.com/CozyCode890/HoiTruyenChu-patches/commit/b1ae700948abd08b5040f7a91090cf6980da59a6))
+
 ## [2.2.0](https://github.com/CozyCode890/HoiTruyenChu-patches/compare/v2.1.0...v2.2.0) (2026-11-23)
 
 ### ✨ New Features
