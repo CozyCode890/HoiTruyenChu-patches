@@ -1,6 +1,6 @@
 {
   "NOTE": "Do NOT manually edit this file. This file is automatically updated when semantic release (release.yml) runs. Manually editing this file can break your releases and break third party tools that use this file.",
-  "version": "2.2.1",
+  "version": "2.2.2",
   "patches": [
     {
       "name": "Auto sync reading history",
@@ -291,7 +291,7 @@
     },
     {
       "name": "TTS reliability",
-      "description": "Fixes text-to-speech reading that stops after a phone call or does nothing when pressing play: re-creates the TTS engine when it dies, pauses during calls and resumes afterwards, retries failed lines, uses the correct Vietnamese voice, and applies a new speed right away instead of after pause + play. A stopped line goes on from the word it was stopped at (pause, lock screen, call, speed change, reopening the book), not from its start.",
+      "description": "Fixes text-to-speech reading that stops after a phone call or does nothing when pressing play: re-creates the TTS engine when it dies, pauses during calls and resumes afterwards, retries failed lines, uses the correct Vietnamese voice, and applies a new speed right away instead of after pause + play. A stopped line goes on from the word it was stopped at (pause, lock screen, call, speed change, reopening the book), not from its start. \"~\" and \"...\" are read naturally (\"1~2\" = \"1 đến 2\", a short pause after \"...\", quotes around \"...\" are not read).",
       "default": true,
       "category": null,
       "compatiblePackages": [

@@ -1,3 +1,9 @@
+## [2.2.2](https://github.com/CozyCode890/HoiTruyenChu-patches/compare/v2.2.1...v2.2.2) (2026-11-28)
+
+### 🐛 Bug Fixes
+
+* sync keeps deleted books away, "~" and "..." read naturally, tap needs a short hold ([3f19230](https://github.com/CozyCode890/HoiTruyenChu-patches/commit/3f192301f4cb965d30de1678ade142dd8004c41e))
+
 ## [2.2.1](https://github.com/CozyCode890/HoiTruyenChu-patches/compare/v2.2.0...v2.2.1) (2026-11-28)
 
 ### 🐛 Bug Fixes

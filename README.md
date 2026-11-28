@@ -23,7 +23,7 @@ Click the button below, or manually add this repo url to Morphe Manager: https:/
 ## 🩹 Patches list
 
 <!-- PATCHES_START EXPANDED -->
-> **[v2.2.1](https://github.com/CozyCode890/HoiTruyenChu-patches/releases/tag/v2.2.1)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;9 patches total
+> **[v2.2.2](https://github.com/CozyCode890/HoiTruyenChu-patches/releases/tag/v2.2.2)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;9 patches total
 <details open>
 <summary>📦 iTruyenChu&nbsp;&nbsp;•&nbsp;&nbsp;9 patches</summary>
 <br>
@@ -44,7 +44,7 @@ Click the button below, or manually add this repo url to Morphe Manager: https:/
 | [Resume listening position](#resume-listening-position) | Opening a book from the bookshelf or "Đọc truyện" goes back to the line where the listening stopped: the voice bar opens with the play button and the line is highlighted, pressing play continues from there. |  |
 | [Show chapter titles](#show-chapter-titles) | Shows the real chapter titles instead of "Vô Đề Mục" in the chapter list, the reader and the TTS: books whose chapter list only has "Chương N" get the title from the first line of the chapter text (public preview, no login needed), cached on the device. |  |
 | [TTS media controls](#tts-media-controls) | The media widget / lock screen shows the TTS reading instead of the silent 6 s file of the voice bar: playing or paused, the position in the chapter (line x/y). Its play / pause and next / previous buttons work like the voice bar's buttons (next / previous chapter), and the previous chapter button of the voice bar, which did nothing, opens the previous chapter. |  |
-| [TTS reliability](#tts-reliability) | Fixes text-to-speech reading that stops after a phone call or does nothing when pressing play: re-creates the TTS engine when it dies, pauses during calls and resumes afterwards, retries failed lines, uses the correct Vietnamese voice, and applies a new speed right away instead of after pause + play. A stopped line goes on from the word it was stopped at (pause, lock screen, call, speed change, reopening the book), not from its start. |  |
+| [TTS reliability](#tts-reliability) | Fixes text-to-speech reading that stops after a phone call or does nothing when pressing play: re-creates the TTS engine when it dies, pauses during calls and resumes afterwards, retries failed lines, uses the correct Vietnamese voice, and applies a new speed right away instead of after pause + play. A stopped line goes on from the word it was stopped at (pause, lock screen, call, speed change, reopening the book), not from its start. "~" and "..." are read naturally ("1~2" = "1 đến 2", a short pause after "...", quotes around "..." are not read). |  |
 | [Tap a line to listen from it](#tap-a-line-to-listen-from-it) | Tapping a line of the chapter (vertical reading) moves the voice reading there: while reading it continues from that line, while stopped the line is highlighted and play starts from it, with the voice bar closed the bar opens and the line is highlighted. What a tap does while reading can be set (tapped line being read: nothing / pause / read again; another line: jump / stop and mark / nothing). Scrolling by hand while listening stops the automatic scrolling and shows a "Về dòng đang đọc" button. Also: where the line being read stays when the reader follows the voice (bottom / top / middle / page), and reading from a tapped word (settings). |  |
 
 </details>
